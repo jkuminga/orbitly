@@ -30,12 +30,12 @@
 - [ ] iPhone 15, 16, 17 화면 폭에서 터치·가독성을 확인한다.
 - [x] PWA(홈 화면에 추가 가능한 웹앱) 메타데이터를 추가한다.
 - [ ] Orbitly 전용 PWA 앱 아이콘을 추가한다.
-- [ ] Safari에서 홈 화면 추가 후 독립 실행되는지 확인한다.
+- [x] Safari에서 홈 화면 추가 후 독립 실행되는지 확인한다.
 - [x] `quick-add`: 제목을 받아 `tasks`에 저장하는 빠른 입력 전용 웹 경로를 구현한다.
 - [x] `quick-add` 화면에서 키보드 입력과 iPhone 받아쓰기를 모두 사용할 수 있게 한다.
-- [ ] `빠른 할 일 입력` 단축어를 만든다. 단축어는 입력값을 `quick-add` URL로 전달하고, 직접 Supabase에 접근하지 않는다.
-- [ ] 설정 > 손쉬운 사용 > 터치 > 뒷면 탭에서 삼중 탭에 `빠른 할 일 입력` 단축어를 지정한다.
-- [ ] 앱 전환 중 Back Tap으로 입력·저장까지 가능한지 검증한다.
+- [x] `빠른 할 일 입력` 단축어를 만든다. 입력값을 `quick-add` URL로 전달해 Orbitly에 저장되는 것을 확인했다.
+- [x] 설정 > 손쉬운 사용 > 터치 > 뒷면 탭에서 삼중 탭에 `빠른 할 일 입력` 단축어를 지정한다.
+- [x] 앱 전환 중 Back Tap으로 입력·저장까지 가능한지 검증한다.
 
 ## 4. macOS 앱
 
@@ -59,8 +59,8 @@
 - [x] Vercel에서 GitHub 저장소를 새 프로젝트로 연결한다.
 - [x] Vercel 환경 변수에 `NEXT_PUBLIC_SUPABASE_URL`과 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`를 Production 환경으로 등록한다.
 - [x] Vercel Production 배포를 실행한다. 현재 주소는 `https://orbitly-lac.vercel.app`이다.
-- [ ] Vercel 배포 주소에서 iPhone 접속과 로그인 상태를 확인한다.
+- [x] Vercel 배포 주소에서 iPhone 접속과 로그인 상태를 확인한다.
 - [ ] 실제 Vercel 주소를 [iPhone 단축어 설정](iphone-shortcut-setup.md)의 `YOUR_ORBITLY_DOMAIN`에 반영한다.
-- [ ] Safari에서 Orbitly를 홈 화면에 추가하고 PWA 독립 실행을 확인한다.
-- [ ] Back Tap 삼중 탭으로 `빠른 할 일 입력` 단축어의 입력·저장 흐름을 확인한다.
+- [x] Safari에서 Orbitly를 홈 화면에 추가하고 PWA 독립 실행을 확인한다.
+- [x] Back Tap 삼중 탭으로 `빠른 할 일 입력` 단축어의 입력·저장 흐름을 확인한다.
 - [ ] 복구를 위한 Supabase 데이터 내보내기 방법을 기록한다.
