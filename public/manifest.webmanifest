@@ -1,0 +1,10 @@
+{
+  "name": "Orbitly",
+  "short_name": "Orbitly",
+  "description": "오늘의 루틴과 할 일을 가볍게 정리합니다.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f6f2",
+  "theme_color": "#f7f6f2",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
