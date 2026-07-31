@@ -10,6 +10,12 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
+// isExpiredSessionError: 만료된 JWT로 인해 Supabase가 요청을 거절한 오류인지 확인합니다.
+function isExpiredSessionError(error: { code?: string; message?: string } | null) {
+  const detail = `${error?.code ?? ""} ${error?.message ?? ""}`.toLowerCase();
+  return error?.code === "PGRST301" || detail.includes("jwt") || detail.includes("unauthorized");
+}
+
 // QuickAddPage: Back Tap 단축어가 전달한 제목을 tasks에 저장하는 전용 화면입니다.
 export default function QuickAddPage() {
   if (!supabase) return <main className="quick-page"><section className="quick-card"><p className="eyebrow">ORBITLY</p><h1>연결 준비가 필요합니다.</h1><p className="error">Supabase 연결 설정이 필요합니다.</p></section></main>;
@@ -26,6 +32,12 @@ function QuickAddForm({ client }: { client: SupabaseClient }) {
     if (!supabase || !nextTitle.trim()) return;
     setStatus("saving");
     const { error } = await client.from("tasks").insert({ title: nextTitle.trim() });
+    if (isExpiredSessionError(error)) {
+      await client.auth.signOut({ scope: "local" });
+      setStatus("signin");
+      setMessage("로그인 세션이 만료되었습니다. 다시 로그인해주세요.");
+      return;
+    }
     if (error) { setStatus("error"); setMessage("저장하지 못했습니다. 다시 시도해주세요."); return; }
     setTitle(""); setStatus("saved"); setMessage(`“${nextTitle.trim()}” 저장됨`);
   }, [client]);
@@ -39,5 +51,5 @@ function QuickAddForm({ client }: { client: SupabaseClient }) {
   }, [client, saveTask]);
   async function submit(event: FormEvent) { event.preventDefault(); await saveTask(title); }
   const isWorking = status === "loading" || status === "saving";
-  return <main className="quick-page"><section className="quick-card"><p className="eyebrow">ORBITLY · QUICK ADD</p><h1>{status === "saved" ? "완료했어요." : "무엇을 할까요?"}</h1>{status === "signin" ? <><p className="sub">빠른 추가를 사용하려면 Orbitly에 먼저 로그인해야 합니다.</p><Link className="primary-link" href="/">Orbitly 로그인</Link></> : <>{status === "saved" ? <><p className="saved-message">{message}</p><button className="secondary" onClick={() => { setStatus("ready"); setMessage(""); }}>하나 더 추가</button><Link className="text-link" href="/">오늘 목록 보기</Link></> : <form onSubmit={submit}><label className="sr-only" htmlFor="task-title">할 일 제목</label><input id="task-title" autoFocus placeholder="예: 우유 사기" value={title} onChange={(event) => setTitle(event.target.value)} disabled={isWorking} /><button disabled={isWorking || !title.trim()}>{status === "saving" ? "저장 중…" : "할 일 저장"}</button>{status === "error" && <p className="error">{message}</p>}</form>}</>}</section></main>;
+  return <main className="quick-page"><section className="quick-card"><p className="eyebrow">ORBITLY · QUICK ADD</p><h1>{status === "saved" ? "완료했어요." : "무엇을 할까요?"}</h1>{status === "signin" ? <><p className="sub">{message || "빠른 추가를 사용하려면 Orbitly에 먼저 로그인해야 합니다."}</p><Link className="primary-link" href="/">Orbitly 로그인</Link></> : <>{status === "saved" ? <><p className="saved-message">{message}</p><button className="secondary" onClick={() => { setStatus("ready"); setMessage(""); }}>하나 더 추가</button><Link className="text-link" href="/">오늘 목록 보기</Link></> : <form onSubmit={submit}><label className="sr-only" htmlFor="task-title">할 일 제목</label><input id="task-title" autoFocus placeholder="예: 우유 사기" value={title} onChange={(event) => setTitle(event.target.value)} disabled={isWorking} /><button disabled={isWorking || !title.trim()}>{status === "saving" ? "저장 중…" : "할 일 저장"}</button>{status === "error" && <p className="error">{message}</p>}</form>}</>}</section></main>;
 }

@@ -10,6 +10,12 @@ type Routine = { id: string; title: string; sort_order: number; is_active: boole
 // RoutineCompletion: 특정 날짜에 루틴을 완료한 기록입니다.
 type RoutineCompletion = { routine_id: string; completed_on: string };
 
+// isExpiredSessionError: Supabase가 만료되었거나 유효하지 않은 JWT를 거절한 오류인지 판별합니다.
+function isExpiredSessionError(error: { code?: string; message?: string } | null) {
+  const detail = `${error?.code ?? ""} ${error?.message ?? ""}`.toLowerCase();
+  return error?.code === "PGRST301" || detail.includes("jwt") || detail.includes("unauthorized");
+}
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
@@ -27,6 +33,14 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const dateLabel = useMemo(() => new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short" }).format(new Date()), []);
 
+  // clearExpiredSession: 오래된 로그인 토큰을 기기에서 지우고 재로그인을 안내합니다.
+  async function clearExpiredSession() {
+    if (!supabase) return;
+    await supabase.auth.signOut({ scope: "local" });
+    setSession(null);
+    setMessage("로그인 세션이 만료되었습니다. 다시 로그인해주세요.");
+  }
+
   async function loadData() {
     if (!supabase) return;
     const [taskResult, routineResult, completionResult] = await Promise.all([
@@ -34,7 +48,12 @@ export default function Home() {
       supabase.from("routines").select("*").eq("is_active", true).order("sort_order"),
       supabase.from("routine_completions").select("routine_id, completed_on").eq("completed_on", today),
     ]);
-    if (taskResult.error || routineResult.error || completionResult.error) setMessage("데이터를 불러오지 못했습니다.");
+    const errors = [taskResult.error, routineResult.error, completionResult.error].filter(Boolean);
+    if (errors.some(isExpiredSessionError)) { await clearExpiredSession(); return; }
+    if (errors.length) {
+      console.error("Orbitly data load failed", errors);
+      setMessage("데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+    }
     setTasks(taskResult.data ?? []);
     setRoutines(routineResult.data ?? []);
     setDoneRoutines(new Set((completionResult.data as RoutineCompletion[] ?? []).map((row) => row.routine_id)));
@@ -45,6 +64,8 @@ export default function Home() {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); if (data.session) loadData(); });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => { setSession(next); if (next) loadData(); });
     return () => listener.subscription.unsubscribe();
+    // Supabase 클라이언트는 모듈 단위의 고정 인스턴스라 최초 한 번만 구독합니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function signIn(event: FormEvent) {
@@ -58,24 +79,29 @@ export default function Home() {
     event.preventDefault();
     if (!supabase || !taskTitle.trim()) return;
     const { error } = await supabase.from("tasks").insert({ title: taskTitle.trim() });
+    if (isExpiredSessionError(error)) { await clearExpiredSession(); return; }
     if (error) setMessage("할 일을 추가하지 못했습니다."); else { setTaskTitle(""); loadData(); }
   }
   async function addRoutine(event: FormEvent) {
     event.preventDefault();
     if (!supabase || !routineTitle.trim()) return;
     const { error } = await supabase.from("routines").insert({ title: routineTitle.trim(), sort_order: routines.length });
+    if (isExpiredSessionError(error)) { await clearExpiredSession(); return; }
     if (error) setMessage("루틴을 추가하지 못했습니다."); else { setRoutineTitle(""); loadData(); }
   }
   async function toggleTask(task: Task) {
     if (!supabase) return;
-    await supabase.from("tasks").update({ is_completed: !task.is_completed, completed_at: !task.is_completed ? new Date().toISOString() : null }).eq("id", task.id);
+    const { error } = await supabase.from("tasks").update({ is_completed: !task.is_completed, completed_at: !task.is_completed ? new Date().toISOString() : null }).eq("id", task.id);
+    if (isExpiredSessionError(error)) { await clearExpiredSession(); return; }
     loadData();
   }
   async function toggleRoutine(routineId: string) {
     if (!supabase) return;
     const completed = doneRoutines.has(routineId);
-    if (completed) await supabase.from("routine_completions").delete().eq("routine_id", routineId).eq("completed_on", today);
-    else await supabase.from("routine_completions").insert({ routine_id: routineId, completed_on: today });
+    const { error } = completed
+      ? await supabase.from("routine_completions").delete().eq("routine_id", routineId).eq("completed_on", today)
+      : await supabase.from("routine_completions").insert({ routine_id: routineId, completed_on: today });
+    if (isExpiredSessionError(error)) { await clearExpiredSession(); return; }
     loadData();
   }
 
