@@ -37,6 +37,8 @@ yarn-error.log*
 # typescript
 next-env.d.ts
 /dist/
+/macOS/.build/
+/macOS/dist/
 /.wrangler/
 /outputs/
 /work/

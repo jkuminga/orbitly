@@ -42,16 +42,17 @@
 - [x] SwiftUI 기반 앱 창과 메뉴바 진입점을 작성한다.
 - [x] `⌘N`: 앱이 활성화된 상태에서 빠르게 할 일을 추가하는 단축키를 정의한다.
 - [x] `⌘O`: 오늘 목록을 여는 단축키를 정의한다.
-- [ ] Supabase 이메일 로그인과 access token 저장(Keychain)을 구현한다.
-- [ ] `TodoStore`: `tasks` 데이터를 읽고 추가·완료 처리하는 상태 객체를 구현한다.
-- [ ] `routines` 및 `routine_completions` 동기화를 구현한다.
+- [x] Supabase 이메일 로그인과 access token 저장(Keychain)을 구현한다.
+- [x] `OrbitlyStore`: `tasks` 데이터를 읽고 추가·완료 처리하는 상태 객체를 구현한다. `OrbitlyStore`는 화면 상태와 Supabase 동기화를 관리하는 객체다.
+- [x] `routines` 및 `routine_completions` 동기화를 구현한다.
+- [x] 메뉴바에서 빠른 할 일 추가와 미완료 할 일 개수 조회를 구현한다.
 - [ ] 전역 단축키: 다른 앱 사용 중에도 동작하는 호출 키의 필요성과 macOS 접근성 권한을 검토한다.
 - [ ] Personal Team 서명으로 로컬 설치를 확인한다.
 
 ## 5. 검증 및 개인 배포
 
 - [x] 웹앱 프로덕션 빌드를 확인한다.
-- [x] Swift 소스 문법을 확인한다.
+- [x] Swift 소스 문법을 확인하고 ad-hoc 서명된 `Orbitly.app` 묶음 생성을 확인한다.
 - [x] 401 인증 오류가 발생하면 오래된 로그인 세션을 정리하고 재로그인을 안내한다.
 - [ ] 실제 Supabase 계정으로 웹과 Mac 간 데이터 동기화를 확인한다.
 - [ ] 로그아웃 후 다른 사용자가 데이터에 접근하지 못하는지 확인한다.

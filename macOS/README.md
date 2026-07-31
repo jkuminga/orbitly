@@ -1,7 +1,20 @@
-# Routine Desk for macOS
+# Orbitly for macOS
 
-Xcode에서 `RoutineDeskApp.swift`를 포함하는 **macOS App (SwiftUI)** 프로젝트를 만든 뒤 이 폴더의 파일을 추가하세요. Xcode의 **Signing & Capabilities**에서 본인 Apple ID의 Personal Team을 선택하면 유료 개발자 계정 없이 로컬 설치할 수 있습니다.
+Orbitly는 메뉴바와 앱 창에서 iPhone 웹앱과 같은 Supabase 데이터를 사용하는 macOS 앱입니다.
 
-`TodoStore`는 `tasks` 테이블과 통신하는 상태 객체입니다. 웹에서 로그인해 받은 Supabase access token을 macOS Keychain에 저장하고, 해당 토큰을 `Authorization: Bearer` 헤더로 전송하도록 구현하면 두 앱이 같은 개인 데이터를 공유합니다.
+## 실행과 설치
 
-메뉴바의 빠른 추가는 `⌘N`, 오늘 목록 열기는 `⌘O` 단축키를 제공합니다. 전역 단축키(다른 앱 사용 중에도 동작)는 App Sandbox 권한 및 별도 단축키 라이브러리 검토가 필요하므로, 첫 버전에서는 앱이 활성화된 상태의 단축키만 포함했습니다.
+```bash
+swift run --package-path macOS
+macOS/scripts/build-app.sh
+```
+
+두 번째 명령은 `macOS/dist/Orbitly.app`을 만듭니다. Finder에서 Applications 폴더로 옮긴 뒤 실행하면 됩니다. ad-hoc 서명은 본인 Mac에서만 사용하는 설치 방식이며 App Store 개발자 연회비가 필요하지 않습니다.
+
+## 첫 실행 설정
+
+1. 웹앱의 `.env.local`에서 `NEXT_PUBLIC_SUPABASE_URL`과 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 값을 확인합니다.
+2. Orbitly의 Supabase 연결 화면에 각각 붙여넣고 저장합니다.
+3. 웹앱과 같은 개인 이메일·비밀번호로 로그인합니다.
+
+`SupabaseSession`은 access token과 refresh token을 담는 로그인 상태이며, macOS Keychain에 저장됩니다. `tasks`는 일회성 할 일, `routines`는 매일 반복하는 루틴, `routine_completions`는 날짜별 루틴 완료 기록입니다.
