@@ -9,7 +9,7 @@
 3. `URL` 액션을 추가하고 아래 형식으로 입력합니다. `제공된 입력`은 2단계의 결과 변수입니다.
 
    ```
-   https://YOUR_ORBITLY_DOMAIN/quick-add?title=[제공된 입력]
+   https://orbitly-lac.vercel.app/quick-add?title=[제공된 입력]
    ```
 
 4. `URL 열기` 액션을 마지막에 추가합니다.
@@ -21,5 +21,5 @@
 ## 사용 전 확인
 
 - Safari에서 Orbitly에 한 번 로그인해야 합니다. 단축어가 여는 `quick-add`는 Safari의 로그인 세션을 이용해 `tasks`에 저장합니다.
-- `YOUR_ORBITLY_DOMAIN`은 웹앱을 올린 뒤 실제 주소로 바꿉니다.
+- Orbitly 주소를 변경하면 단축어의 URL도 새 주소로 바꿉니다.
 - `tasks`는 한 번 완료하면 끝나는 할 일 테이블입니다. 저장된 항목은 Orbitly의 오늘 목록에 바로 나타납니다.

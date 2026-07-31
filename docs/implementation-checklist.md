@@ -55,10 +55,10 @@
 - [ ] 실제 Supabase 계정으로 웹과 Mac 간 데이터 동기화를 확인한다.
 - [ ] 로그아웃 후 다른 사용자가 데이터에 접근하지 못하는지 확인한다.
 - [x] Vercel 배포용 Next.js 설정으로 웹 프로젝트를 정리한다.
-- [ ] GitHub 저장소를 만들고 Orbitly 코드를 올린다.
-- [ ] Vercel에서 GitHub 저장소를 새 프로젝트로 연결한다.
-- [ ] Vercel 환경 변수에 `NEXT_PUBLIC_SUPABASE_URL`과 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`를 Production 환경으로 등록한다.
-- [ ] Vercel Production 배포를 실행한다.
+- [x] GitHub 저장소를 만들고 Orbitly 코드를 올린다.
+- [x] Vercel에서 GitHub 저장소를 새 프로젝트로 연결한다.
+- [x] Vercel 환경 변수에 `NEXT_PUBLIC_SUPABASE_URL`과 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`를 Production 환경으로 등록한다.
+- [x] Vercel Production 배포를 실행한다. 현재 주소는 `https://orbitly-lac.vercel.app`이다.
 - [ ] Vercel 배포 주소에서 iPhone 접속과 로그인 상태를 확인한다.
 - [ ] 실제 Vercel 주소를 [iPhone 단축어 설정](iphone-shortcut-setup.md)의 `YOUR_ORBITLY_DOMAIN`에 반영한다.
 - [ ] Safari에서 Orbitly를 홈 화면에 추가하고 PWA 독립 실행을 확인한다.
