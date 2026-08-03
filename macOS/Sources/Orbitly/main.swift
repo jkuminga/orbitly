@@ -156,9 +156,23 @@ final class OrbitlyStore: ObservableObject {
     private func run(_ work: @escaping () async throws -> Void) async { isLoading = true; errorMessage = nil; defer { isLoading = false }; do { try await work() } catch { if let message = (error as? LocalizedError)?.errorDescription, message.lowercased().contains("jwt") { signOut() }; errorMessage = error.localizedDescription } }
 }
 
+// OrbitlyAppDelegate: 실행·재실행 시 Orbitly 창을 활성화하고 키 입력 포커스를 부여합니다.
+final class OrbitlyAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) { focusMainWindow(after: 0.15) }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { focusMainWindow(after: 0); return true }
+    private func focusMainWindow(after delay: TimeInterval) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            NSApp.activate(ignoringOtherApps: true)
+            let window = NSApp.windows.first { $0.canBecomeKey }
+            window?.makeKeyAndOrderFront(nil)
+        }
+    }
+}
+
 @main
 struct OrbitlyApp: App {
     @StateObject private var store = OrbitlyStore()
+    @NSApplicationDelegateAdaptor(OrbitlyAppDelegate.self) private var appDelegate
     var body: some Scene {
         WindowGroup("Orbitly") { RootView().environmentObject(store).task { await store.restoreAndLoad() } }
         MenuBarExtra("Orbitly", systemImage: "circle.dotted") { MenuBarView().environmentObject(store) }.menuBarExtraStyle(.window)
@@ -173,13 +187,15 @@ struct RootView: View {
 
 struct ConfigView: View {
     @EnvironmentObject private var store: OrbitlyStore
-    var body: some View { Form { Section("Supabase 연결") { TextField("Project URL", text: $store.config.url); SecureField("Publishable key", text: $store.config.publishableKey); Text("Publishable key는 RLS 정책과 함께 사용하는 공개 키입니다.").font(.caption).foregroundStyle(.secondary) }; Button("설정 저장") { store.saveConfig() }.disabled(!store.config.isComplete) }.padding().frame(width: 440) }
+    @FocusState private var isURLFocused: Bool
+    var body: some View { Form { Section("Supabase 연결") { TextField("Project URL", text: $store.config.url).focused($isURLFocused); SecureField("Publishable key", text: $store.config.publishableKey); Text("Publishable key는 RLS 정책과 함께 사용하는 공개 키입니다.").font(.caption).foregroundStyle(.secondary) }; Button("설정 저장") { store.saveConfig() }.disabled(!store.config.isComplete) }.padding().frame(width: 440).onAppear { isURLFocused = true } }
 }
 
 struct SignInView: View {
     @EnvironmentObject private var store: OrbitlyStore
     @State private var email = ""; @State private var password = ""
-    var body: some View { VStack(alignment: .leading, spacing: 18) { Text("Orbitly").font(.largeTitle.bold()); Text("Mac과 iPhone의 할 일을 함께 관리합니다.").foregroundStyle(.secondary); TextField("이메일", text: $email); SecureField("비밀번호", text: $password); Button("로그인") { Task { await store.signIn(email: email, password: password) } }.keyboardShortcut(.defaultAction).disabled(store.isLoading || email.isEmpty || password.isEmpty) }.padding(32).frame(width: 380) }
+    @FocusState private var isEmailFocused: Bool
+    var body: some View { VStack(alignment: .leading, spacing: 18) { Text("Orbitly").font(.largeTitle.bold()); Text("Mac과 iPhone의 할 일을 함께 관리합니다.").foregroundStyle(.secondary); TextField("이메일", text: $email).focused($isEmailFocused); SecureField("비밀번호", text: $password); Button("로그인") { Task { await store.signIn(email: email, password: password) } }.keyboardShortcut(.defaultAction).disabled(store.isLoading || email.isEmpty || password.isEmpty) }.padding(32).frame(width: 380).onAppear { isEmailFocused = true } }
 }
 
 struct TodayView: View {
