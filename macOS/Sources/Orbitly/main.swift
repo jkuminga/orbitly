@@ -92,6 +92,10 @@ struct SupabaseClient {
         if completed { let _: [RoutineCompletion] = try await request(path: "/rest/v1/routine_completions?routine_id=eq.\(routineID.uuidString)&completed_on=eq.\(day)", method: "DELETE", token: token) }
         else { let _: [RoutineCompletion] = try await request(path: "/rest/v1/routine_completions", method: "POST", body: ["routine_id": routineID.uuidString, "completed_on": day], token: token) }
     }
+    // deleteTask: tasks 테이블에서 선택한 일회성 할 일을 삭제합니다.
+    func deleteTask(_ taskID: UUID, token: String) async throws { let _: [TaskItem] = try await request(path: "/rest/v1/tasks?id=eq.\(taskID.uuidString)", method: "DELETE", token: token) }
+    // deleteRoutine: routines 테이블에서 루틴과 연결된 완료 기록을 함께 삭제합니다.
+    func deleteRoutine(_ routineID: UUID, token: String) async throws { let _: [RoutineItem] = try await request(path: "/rest/v1/routines?id=eq.\(routineID.uuidString)", method: "DELETE", token: token) }
     private func request<Response: Decodable>(path: String, method: String = "GET", body: [String: Any]? = nil, token: String?) async throws -> Response {
         var request = URLRequest(url: url(for: path))
         request.httpMethod = method
@@ -152,6 +156,8 @@ final class OrbitlyStore: ObservableObject {
     func addRoutine(_ title: String) async { guard let token = session?.accessToken, let client, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }; await run { try await client.addRoutine(title: title, sortOrder: self.routines.count, token: token); await self.load() } }
     func toggleTask(_ task: TaskItem) async { guard let token = session?.accessToken, let client else { return }; await run { try await client.setTask(task, token: token); await self.load() } }
     func toggleRoutine(_ routine: RoutineItem) async { guard let token = session?.accessToken, let client else { return }; await run { try await client.setRoutine(routine.id, completed: self.completedRoutineIDs.contains(routine.id), day: self.today, token: token); await self.load() } }
+    func deleteTask(_ task: TaskItem) async { guard let token = session?.accessToken, let client else { return }; await run { try await client.deleteTask(task.id, token: token); await self.load() } }
+    func deleteRoutine(_ routine: RoutineItem) async { guard let token = session?.accessToken, let client else { return }; await run { try await client.deleteRoutine(routine.id, token: token); await self.load() } }
     func signOut() { KeychainStore.remove(); session = nil; tasks = []; routines = []; completedRoutineIDs = [] }
     private func run(_ work: @escaping () async throws -> Void) async { isLoading = true; errorMessage = nil; defer { isLoading = false }; do { try await work() } catch { if let message = (error as? LocalizedError)?.errorDescription, message.lowercased().contains("jwt") { signOut() }; errorMessage = error.localizedDescription } }
 }
@@ -201,12 +207,18 @@ struct SignInView: View {
 struct TodayView: View {
     @EnvironmentObject private var store: OrbitlyStore
     @State private var taskTitle = ""; @State private var routineTitle = ""
-    var body: some View { VStack(alignment: .leading, spacing: 18) { HStack { VStack(alignment: .leading) { Text("오늘의 흐름").font(.largeTitle.bold()); Text(Date.now.formatted(date: .abbreviated, time: .omitted)).foregroundStyle(.secondary) }; Spacer(); Button("새로고침") { Task { await store.load() } }; Button("로그아웃") { store.signOut() } }.padding(.bottom, 6); HStack(alignment: .top, spacing: 16) { ItemColumn(title: "매일 할 루틴", input: $routineTitle, placeholder: "루틴 추가", items: store.routines.map { ($0.id, $0.title, store.completedRoutineIDs.contains($0.id)) }, onAdd: { Task { await store.addRoutine(routineTitle); routineTitle = "" } }, onToggle: { id in if let item = store.routines.first(where: { $0.id == id }) { Task { await store.toggleRoutine(item) } } }); ItemColumn(title: "해야 할 일", input: $taskTitle, placeholder: "할 일 추가", items: store.tasks.map { ($0.id, $0.title, $0.isCompleted) }, onAdd: { Task { await store.addTask(taskTitle); taskTitle = "" } }, onToggle: { id in if let item = store.tasks.first(where: { $0.id == id }) { Task { await store.toggleTask(item) } } }) } }.padding(28).frame(minWidth: 720, minHeight: 440) }
+    @State private var deletion: PendingDeletion?
+    var body: some View { VStack(alignment: .leading, spacing: 18) { HStack { VStack(alignment: .leading) { Text("오늘의 흐름").font(.largeTitle.bold()); Text(Date.now.formatted(date: .abbreviated, time: .omitted)).foregroundStyle(.secondary) }; Spacer(); Button("새로고침") { Task { await store.load() } }; Button("로그아웃") { store.signOut() } }.padding(.bottom, 6); HStack(alignment: .top, spacing: 16) { ItemColumn(title: "매일 할 루틴", input: $routineTitle, placeholder: "루틴 추가", items: store.routines.map { ($0.id, $0.title, store.completedRoutineIDs.contains($0.id)) }, onAdd: { Task { await store.addRoutine(routineTitle); routineTitle = "" } }, onToggle: { id in if let item = store.routines.first(where: { $0.id == id }) { Task { await store.toggleRoutine(item) } } }, onDelete: { id in if let item = store.routines.first(where: { $0.id == id }) { deletion = PendingDeletion(id: id, title: item.title, kind: .routine) } }); ItemColumn(title: "해야 할 일", input: $taskTitle, placeholder: "할 일 추가", items: store.tasks.map { ($0.id, $0.title, $0.isCompleted) }, onAdd: { Task { await store.addTask(taskTitle); taskTitle = "" } }, onToggle: { id in if let item = store.tasks.first(where: { $0.id == id }) { Task { await store.toggleTask(item) } } }, onDelete: { id in if let item = store.tasks.first(where: { $0.id == id }) { deletion = PendingDeletion(id: id, title: item.title, kind: .task) } }) } }.padding(28).frame(minWidth: 720, minHeight: 440).confirmationDialog("항목을 삭제할까요?", isPresented: Binding(get: { deletion != nil }, set: { if !$0 { deletion = nil } })) { Button("삭제", role: .destructive) { deleteSelectedItem() }; Button("취소", role: .cancel) { deletion = nil } } message: { Text(deletion.map { "“\($0.title)”은(는) 삭제 후 복구할 수 없습니다." } ?? "") } }
+    // deleteSelectedItem: 확인된 삭제 대상을 tasks 또는 routines에서 제거합니다.
+    private func deleteSelectedItem() { guard let deletion else { return }; self.deletion = nil; Task { if deletion.kind == .task, let task = store.tasks.first(where: { $0.id == deletion.id }) { await store.deleteTask(task) } else if let routine = store.routines.first(where: { $0.id == deletion.id }) { await store.deleteRoutine(routine) } } }
 }
 
+// PendingDeletion: 삭제 확인 대화상자에 표시할 항목과 종류를 보관합니다.
+struct PendingDeletion: Identifiable { enum Kind { case task, routine }; let id: UUID; let title: String; let kind: Kind }
+
 struct ItemColumn: View {
-    let title: String; @Binding var input: String; let placeholder: String; let items: [(UUID, String, Bool)]; let onAdd: () -> Void; let onToggle: (UUID) -> Void
-    var body: some View { VStack(alignment: .leading, spacing: 10) { Text(title).font(.headline); List(items, id: \.0) { item in Button { onToggle(item.0) } label: { Label(item.1, systemImage: item.2 ? "checkmark.circle.fill" : "circle") }.buttonStyle(.plain) }.frame(minHeight: 250); HStack { TextField(placeholder, text: $input).onSubmit(onAdd); Button(action: onAdd) { Image(systemName: "plus") }.keyboardShortcut("n", modifiers: [.command]) } }.frame(maxWidth: .infinity) }
+    let title: String; @Binding var input: String; let placeholder: String; let items: [(UUID, String, Bool)]; let onAdd: () -> Void; let onToggle: (UUID) -> Void; let onDelete: (UUID) -> Void
+    var body: some View { VStack(alignment: .leading, spacing: 10) { Text(title).font(.headline); List(items, id: \.0) { item in HStack { Button { onToggle(item.0) } label: { Label(item.1, systemImage: item.2 ? "checkmark.circle.fill" : "circle") }.buttonStyle(.plain); Spacer(); Button(role: .destructive) { onDelete(item.0) } label: { Image(systemName: "trash") }.buttonStyle(.borderless).help("삭제") } }.frame(minHeight: 250); HStack { TextField(placeholder, text: $input).onSubmit(onAdd); Button(action: onAdd) { Image(systemName: "plus") }.keyboardShortcut("n", modifiers: [.command]) } }.frame(maxWidth: .infinity) }
 }
 
 struct MenuBarView: View {
