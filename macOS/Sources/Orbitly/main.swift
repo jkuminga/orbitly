@@ -171,6 +171,7 @@ final class OrbitlyAppDelegate: NSObject, NSApplicationDelegate {
     private let quickAddPopover = NSPopover()
     private var hotKeyRef: EventHotKeyRef?
     private var hotKeyHandler: EventHandlerRef?
+    private var openMainWindow: (() -> Void)?
 
     func configure(store: OrbitlyStore) {
         guard self.store == nil else { return }
@@ -178,6 +179,9 @@ final class OrbitlyAppDelegate: NSObject, NSApplicationDelegate {
         configureStatusItem()
         registerGlobalShortcut()
     }
+
+    // configureMainWindow: WindowGroup의 openWindow 동작을 저장해 창이 닫힌 상태에서도 다시 열 수 있게 합니다.
+    func configureMainWindow(opener: @escaping () -> Void) { openMainWindow = opener }
 
     func applicationDidFinishLaunching(_ notification: Notification) { focusMainWindow(after: 0.15) }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { focusMainWindow(after: 0); return true }
@@ -204,9 +208,22 @@ final class OrbitlyAppDelegate: NSObject, NSApplicationDelegate {
             guard let store = self.store, let button = self.statusItem.button else { return }
             NSApp.activate(ignoringOtherApps: true)
             if self.quickAddPopover.isShown { self.quickAddPopover.performClose(nil) }
-            self.quickAddPopover.contentViewController = NSHostingController(rootView: MenuBarView().environmentObject(store))
+            self.quickAddPopover.contentViewController = NSHostingController(rootView: MenuBarView(onShowMainWindow: self.showMainWindow).environmentObject(store))
             self.quickAddPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
+    }
+
+    // showMainWindow: 메뉴바 팝오버를 닫고 Orbitly의 실제 메인 창을 앞으로 가져오거나 새로 엽니다.
+    func showMainWindow() {
+        if quickAddPopover.isShown { quickAddPopover.performClose(nil) }
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = mainWindow {
+            window.orderFrontRegardless()
+            window.makeKey()
+            return
+        }
+        openMainWindow?()
+        focusMainWindow(after: 0.1)
     }
 
     private func registerGlobalShortcut() {
@@ -227,9 +244,13 @@ final class OrbitlyAppDelegate: NSObject, NSApplicationDelegate {
     private func focusMainWindow(after delay: TimeInterval) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             NSApp.activate(ignoringOtherApps: true)
-            let window = NSApp.windows.first { $0.canBecomeKey }
+            let window = self.mainWindow
             window?.makeKeyAndOrderFront(nil)
         }
+    }
+
+    private var mainWindow: NSWindow? {
+        NSApp.windows.first { $0.title == "Orbitly" && $0.styleMask.contains(.titled) && !($0 is NSPanel) }
     }
 }
 
@@ -238,7 +259,21 @@ struct OrbitlyApp: App {
     @StateObject private var store = OrbitlyStore()
     @NSApplicationDelegateAdaptor(OrbitlyAppDelegate.self) private var appDelegate
     var body: some Scene {
-        WindowGroup("Orbitly") { RootView().environmentObject(store).task { await store.restoreAndLoad() }.onAppear { appDelegate.configure(store: store) } }
+        WindowGroup("Orbitly", id: "orbitly-main") { OrbitlyMainWindow(appDelegate: appDelegate).environmentObject(store) }
+    }
+}
+
+// OrbitlyMainWindow: WindowGroup의 openWindow 동작을 앱 델리게이트에 제공하는 메인 창 루트입니다.
+private struct OrbitlyMainWindow: View {
+    @EnvironmentObject private var store: OrbitlyStore
+    @Environment(\.openWindow) private var openWindow
+    let appDelegate: OrbitlyAppDelegate
+    var body: some View {
+        RootView().task { await store.restoreAndLoad() }.onAppear {
+            appDelegate.configure(store: store)
+            let opener = openWindow
+            appDelegate.configureMainWindow { opener(id: "orbitly-main") }
+        }
     }
 }
 
@@ -371,6 +406,7 @@ struct ItemColumn: View {
 
 struct MenuBarView: View {
     @EnvironmentObject private var store: OrbitlyStore
+    let onShowMainWindow: () -> Void
     @State private var title = ""
     @FocusState private var isInputFocused: Bool
     var body: some View {
@@ -381,7 +417,7 @@ struct MenuBarView: View {
             Button("저장", action: add).buttonStyle(.borderedProminent).tint(OrbitlyPalette.deepOlive).frame(maxWidth: .infinity).disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             Divider()
             HStack { Text("미완료").foregroundStyle(.secondary); Spacer(); Text("\(store.tasks.filter { !$0.isCompleted }.count)개").fontWeight(.semibold) }
-            Button("오늘 목록 열기") { NSApp.activate(ignoringOtherApps: true); NSApp.windows.first { $0.canBecomeKey }?.makeKeyAndOrderFront(nil) }.buttonStyle(.plain).foregroundStyle(OrbitlyPalette.deepOlive)
+            Button("오늘 목록 열기", action: onShowMainWindow).buttonStyle(.plain).foregroundStyle(OrbitlyPalette.deepOlive)
         }.padding(16).frame(width: 300).onAppear { isInputFocused = true }
     }
     private func add() { let value = title; title = ""; Task { await store.addTask(value) } }
