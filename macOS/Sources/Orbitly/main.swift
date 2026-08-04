@@ -19,7 +19,8 @@ struct SupabaseSession: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         accessToken = try container.decode(String.self, forKey: .accessToken)
         refreshToken = try container.decode(String.self, forKey: .refreshToken)
-        if let savedExpiry = try container.decodeIfPresent(Date.self, forKey: .expiresAt) { expiresAt = savedExpiry }
+        // Supabase의 expires_at은 Unix 초 단위 숫자입니다. Date 기본 디코딩과 섞이면 만료 시각이 틀어질 수 있어 직접 변환합니다.
+        if let unixTimestamp = try container.decodeIfPresent(Double.self, forKey: .expiresAt) { expiresAt = Date(timeIntervalSince1970: unixTimestamp) }
         else { expiresAt = Date().addingTimeInterval(TimeInterval(try container.decode(Int.self, forKey: .expiresIn))) }
     }
     init(accessToken: String, refreshToken: String, expiresAt: Date) { self.accessToken = accessToken; self.refreshToken = refreshToken; self.expiresAt = expiresAt }
@@ -27,7 +28,7 @@ struct SupabaseSession: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(accessToken, forKey: .accessToken)
         try container.encode(refreshToken, forKey: .refreshToken)
-        try container.encode(expiresAt, forKey: .expiresAt)
+        try container.encode(expiresAt.timeIntervalSince1970, forKey: .expiresAt)
     }
 }
 
@@ -130,6 +131,8 @@ final class OrbitlyStore: ObservableObject {
     @Published var isLoading = false
     private var client: SupabaseClient? { config.isComplete ? SupabaseClient(config: config) : nil }
     private var today: String { ISO8601DateFormatter().string(from: Date()).prefix(10).description }
+    private var refreshTask: Task<SupabaseSession, Error>?
+    private let refreshLeadTime: TimeInterval = 5 * 60
     init() { session = KeychainStore.read() }
     func saveConfig() { UserDefaults.standard.set(config.url.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "supabaseURL"); UserDefaults.standard.set(config.publishableKey.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "supabasePublishableKey") }
     func signIn(email: String, password: String) async {
@@ -137,30 +140,57 @@ final class OrbitlyStore: ObservableObject {
         await run { let session = try await client.signIn(email: email, password: password); self.session = session; try KeychainStore.save(session); await self.load() }
     }
     func restoreAndLoad() async {
-        guard let session, let client else { return }
-        await run {
-            let fresh = session.expiresAt < Date().addingTimeInterval(60) ? try await client.refresh(session) : session
-            self.session = fresh; try KeychainStore.save(fresh); await self.load()
-        }
+        guard session != nil else { return }
+        await load()
     }
     func load() async {
-        guard let token = session?.accessToken, let client else { return }
         await run {
-            async let taskResult = client.tasks(token: token)
-            async let routineResult = client.routines(token: token)
-            async let completionResult = client.completions(token: token, day: self.today)
-            let (loadedTasks, loadedRoutines, completions) = try await (taskResult, routineResult, completionResult)
+            let (loadedTasks, loadedRoutines, completions) = try await self.withValidSession { client, token in
+                async let taskResult = client.tasks(token: token)
+                async let routineResult = client.routines(token: token)
+                async let completionResult = client.completions(token: token, day: self.today)
+                return try await (taskResult, routineResult, completionResult)
+            }
             self.tasks = loadedTasks; self.routines = loadedRoutines; self.completedRoutineIDs = Set(completions.map(\.routineID))
         }
     }
-    func addTask(_ title: String) async { guard let token = session?.accessToken, let client, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }; await run { try await client.addTask(title: title, token: token); await self.load() } }
-    func addRoutine(_ title: String) async { guard let token = session?.accessToken, let client, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }; await run { try await client.addRoutine(title: title, sortOrder: self.routines.count, token: token); await self.load() } }
-    func toggleTask(_ task: TaskItem) async { guard let token = session?.accessToken, let client else { return }; await run { try await client.setTask(task, token: token); await self.load() } }
-    func toggleRoutine(_ routine: RoutineItem) async { guard let token = session?.accessToken, let client else { return }; await run { try await client.setRoutine(routine.id, completed: self.completedRoutineIDs.contains(routine.id), day: self.today, token: token); await self.load() } }
-    func deleteTask(_ task: TaskItem) async { guard let token = session?.accessToken, let client else { return }; await run { try await client.deleteTask(task.id, token: token); await self.load() } }
-    func deleteRoutine(_ routine: RoutineItem) async { guard let token = session?.accessToken, let client else { return }; await run { try await client.deleteRoutine(routine.id, token: token); await self.load() } }
+    func addTask(_ title: String) async { guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }; await run { try await self.withValidSession { client, token in try await client.addTask(title: title, token: token) }; await self.load() } }
+    func addRoutine(_ title: String) async { guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }; await run { try await self.withValidSession { client, token in try await client.addRoutine(title: title, sortOrder: self.routines.count, token: token) }; await self.load() } }
+    func toggleTask(_ task: TaskItem) async { await run { try await self.withValidSession { client, token in try await client.setTask(task, token: token) }; await self.load() } }
+    func toggleRoutine(_ routine: RoutineItem) async { await run { try await self.withValidSession { client, token in try await client.setRoutine(routine.id, completed: self.completedRoutineIDs.contains(routine.id), day: self.today, token: token) }; await self.load() } }
+    func deleteTask(_ task: TaskItem) async { await run { try await self.withValidSession { client, token in try await client.deleteTask(task.id, token: token) }; await self.load() } }
+    func deleteRoutine(_ routine: RoutineItem) async { await run { try await self.withValidSession { client, token in try await client.deleteRoutine(routine.id, token: token) }; await self.load() } }
     func signOut() { KeychainStore.remove(); session = nil; tasks = []; routines = []; completedRoutineIDs = [] }
-    private func run(_ work: @escaping () async throws -> Void) async { isLoading = true; errorMessage = nil; defer { isLoading = false }; do { try await work() } catch { if let message = (error as? LocalizedError)?.errorDescription, message.lowercased().contains("jwt") { signOut() }; errorMessage = error.localizedDescription } }
+    // withValidSession: 요청 직전에 세션을 갱신하고, 만료 응답은 한 번 재발급 후 같은 요청을 다시 실행합니다.
+    private func withValidSession<Result>(_ work: @escaping (SupabaseClient, String) async throws -> Result) async throws -> Result {
+        let (client, current) = try await usableSession(forceRefresh: false)
+        do { return try await work(client, current.accessToken) }
+        catch {
+            guard isExpiredTokenError(error) else { throw error }
+            let (refreshedClient, refreshed) = try await usableSession(forceRefresh: true)
+            return try await work(refreshedClient, refreshed.accessToken)
+        }
+    }
+    private func usableSession(forceRefresh: Bool) async throws -> (SupabaseClient, SupabaseSession) {
+        guard let current = session, let client else { throw OrbitlyError(message: "로그인 세션을 찾을 수 없습니다.") }
+        guard forceRefresh || current.expiresAt < Date().addingTimeInterval(refreshLeadTime) else { return (client, current) }
+        let refreshed: SupabaseSession
+        if let refreshTask { refreshed = try await refreshTask.value }
+        else {
+            let task = Task { try await client.refresh(current) }
+            refreshTask = task
+            do { refreshed = try await task.value; refreshTask = nil }
+            catch { refreshTask = nil; throw error }
+        }
+        session = refreshed
+        try KeychainStore.save(refreshed)
+        return (client, refreshed)
+    }
+    private func isExpiredTokenError(_ error: Error) -> Bool {
+        let message = error.localizedDescription.lowercased()
+        return message.contains("jwt") || message.contains("token is expired") || message.contains("unauthorized")
+    }
+    private func run(_ work: @escaping () async throws -> Void) async { isLoading = true; errorMessage = nil; defer { isLoading = false }; do { try await work() } catch { if isExpiredTokenError(error) { signOut(); errorMessage = "로그인 세션이 만료되었습니다. 다시 로그인해주세요." } else { errorMessage = error.localizedDescription } } }
 }
 
 // OrbitlyAppDelegate: 앱 창, 메뉴바 빠른 추가창, 전역 호출 키를 관리합니다.
