@@ -44,6 +44,7 @@
 - [x] SwiftUI 기반 앱 창과 메뉴바 진입점을 작성한다.
 - [x] 웹앱과 같은 아이보리 카드·올리브 포인트 스타일로 macOS 화면과 메뉴바 빠른 추가 창을 개선한다.
 - [x] Supabase 이메일 로그인과 access token 저장(Keychain)을 구현한다.
+- [ ] `SupabaseSession` 자동 갱신: 실행 중인 Mac 앱의 모든 API 요청 전에 access token 만료를 확인하고 refresh token으로 갱신한다. `SupabaseSession`은 access token·refresh token·만료 시각을 보관하는 로그인 상태다.
 - [x] `OrbitlyStore`: `tasks` 데이터를 읽고 추가·완료 처리하는 상태 객체를 구현한다. `OrbitlyStore`는 화면 상태와 Supabase 동기화를 관리하는 객체다.
 - [x] `routines` 및 `routine_completions` 동기화를 구현한다.
 - [x] 메뉴바에서 빠른 할 일 추가와 미완료 할 일 개수 조회를 구현한다.
