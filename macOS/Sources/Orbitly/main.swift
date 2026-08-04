@@ -408,17 +408,78 @@ struct MenuBarView: View {
     @EnvironmentObject private var store: OrbitlyStore
     let onShowMainWindow: () -> Void
     @State private var title = ""
+    @State private var selectedKind: QuickAddKind = .task
     @FocusState private var isInputFocused: Bool
+    private var completedTaskCount: Int { store.tasks.filter(\.isCompleted).count }
+    private var completedRoutineCount: Int { store.completedRoutineIDs.count }
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack { Image(systemName: "circle.dotted").foregroundStyle(OrbitlyPalette.olive); Text("ORBITLY").font(.caption.weight(.bold)).tracking(1.2).foregroundStyle(.secondary); Spacer(); Text("⌃⌥⌘O").font(.caption2.monospaced()).foregroundStyle(.tertiary) }
-            Text("빠른 할 일 추가").font(.title3.weight(.semibold))
-            TextField("할 일을 입력하세요", text: $title).textFieldStyle(.plain).focused($isInputFocused).padding(10).background(OrbitlyPalette.canvas, in: RoundedRectangle(cornerRadius: 9)).onSubmit(add)
-            Button("저장", action: add).buttonStyle(.borderedProminent).tint(OrbitlyPalette.deepOlive).frame(maxWidth: .infinity).disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 7) {
+                Image(systemName: "circle.dotted").font(.caption.weight(.bold)).foregroundStyle(OrbitlyPalette.deepOlive)
+                Text("ORBITLY").font(.caption2.weight(.bold)).tracking(1.1).foregroundStyle(OrbitlyPalette.ink)
+                Spacer()
+                Button(action: onShowMainWindow) { Image(systemName: "gearshape").font(.callout.weight(.medium)) }.buttonStyle(.plain).foregroundStyle(.secondary).help("오늘 목록 열기")
+            }
+            Text("빠른 추가").font(.headline.weight(.semibold)).foregroundStyle(OrbitlyPalette.ink)
+            TextField(selectedKind.placeholder, text: $title).textFieldStyle(.plain).focused($isInputFocused).padding(.horizontal, 10).padding(.vertical, 9).background(.white, in: RoundedRectangle(cornerRadius: 7)).onSubmit(add)
+            HStack(spacing: 6) {
+                QuickAddKindButton(kind: .task, selection: $selectedKind)
+                QuickAddKindButton(kind: .routine, selection: $selectedKind)
+                Spacer()
+                Button("저장", action: add).buttonStyle(.borderedProminent).controlSize(.small).tint(OrbitlyPalette.deepOlive).disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
             Divider()
-            HStack { Text("미완료").foregroundStyle(.secondary); Spacer(); Text("\(store.tasks.filter { !$0.isCompleted }.count)개").fontWeight(.semibold) }
-            Button("오늘 목록 열기", action: onShowMainWindow).buttonStyle(.plain).foregroundStyle(OrbitlyPalette.deepOlive)
-        }.padding(16).frame(width: 300).onAppear { isInputFocused = true }
+            VStack(alignment: .leading, spacing: 9) {
+                Text("진행 상황").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                MenuBarProgressRow(label: "할일", completed: completedTaskCount, total: store.tasks.count)
+                MenuBarProgressRow(label: "루틴", completed: completedRoutineCount, total: store.routines.count)
+            }
+            Divider()
+            Button("오늘 목록 열기", action: onShowMainWindow).buttonStyle(.plain).foregroundStyle(OrbitlyPalette.ink)
+        }.padding(16).frame(width: 300).background(OrbitlyPalette.canvas).onAppear { isInputFocused = true }
     }
-    private func add() { let value = title; title = ""; Task { await store.addTask(value) } }
+    // add: 선택된 QuickAddKind에 따라 tasks 또는 routines에 새 항목을 저장합니다.
+    private func add() {
+        let value = title
+        title = ""
+        Task { if selectedKind == .task { await store.addTask(value) } else { await store.addRoutine(value) } }
+    }
+}
+
+// QuickAddKind: 메뉴바 빠른 추가에서 저장할 항목의 종류(일회성 할일 또는 매일 루틴)입니다.
+private enum QuickAddKind: String, CaseIterable { case task, routine
+    var title: String { self == .task ? "할일" : "루틴" }
+    var placeholder: String { self == .task ? "할 일을 입력하세요" : "루틴을 입력하세요" }
+}
+
+private struct QuickAddKindButton: View {
+    let kind: QuickAddKind
+    @Binding var selection: QuickAddKind
+    var body: some View {
+        Button(kind.title) { selection = kind }
+            .buttonStyle(.plain)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(selection == kind ? Color.white : Color.secondary)
+            .padding(.horizontal, 11).padding(.vertical, 6)
+            .background(selection == kind ? OrbitlyPalette.deepOlive : Color.black.opacity(0.06), in: Capsule())
+    }
+}
+
+private struct MenuBarProgressRow: View {
+    let label: String
+    let completed: Int
+    let total: Int
+    private var fraction: Double { total == 0 ? 0 : Double(completed) / Double(total) }
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(label).font(.caption).frame(width: 28, alignment: .leading).foregroundStyle(OrbitlyPalette.ink)
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.black.opacity(0.1))
+                    Capsule().fill(OrbitlyPalette.deepOlive).frame(width: proxy.size.width * fraction)
+                }
+            }.frame(height: 4)
+            Text("\(completed)/\(total)").font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 28, alignment: .trailing)
+        }
+    }
 }

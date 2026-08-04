@@ -47,7 +47,7 @@
 - [ ] `SupabaseSession` 자동 갱신: 실행 중인 Mac 앱의 모든 API 요청 전에 access token 만료를 확인하고 refresh token으로 갱신한다. `SupabaseSession`은 access token·refresh token·만료 시각을 보관하는 로그인 상태다.
 - [x] `OrbitlyStore`: `tasks` 데이터를 읽고 추가·완료 처리하는 상태 객체를 구현한다. `OrbitlyStore`는 화면 상태와 Supabase 동기화를 관리하는 객체다.
 - [x] `routines` 및 `routine_completions` 동기화를 구현한다.
-- [x] 메뉴바에서 빠른 할 일 추가와 미완료 할 일 개수 조회를 구현한다.
+- [x] 메뉴바에서 할일·루틴을 선택해 빠르게 추가하고, 두 종류의 완료 진행률과 완료 수를 함께 조회한다.
 - [x] macOS 앱에서 `tasks`와 `routines` 삭제 및 확인 대화상자를 구현한다.
 - [x] `update-local.sh`: 최신 코드를 받고, macOS 앱을 빌드·교체·실행하는 로컬 업데이트 명령을 만든다. `--ff-only`는 충돌 가능성이 있는 자동 병합을 막는 Git 옵션이다.
 - [x] 전역 단축키 `⌃⌥⌘O`를 등록해 다른 앱 사용 중에도 메뉴바 빠른 추가 창을 연다. `⌃⌥⌘O`는 Control·Option·Command·O 조합이며, 기존 `⌘N`·`⌘O`와 겹치지 않는다.
