@@ -1,4 +1,4 @@
-# Routine Desk 작업 체크리스트
+# Orbitly 작업 체크리스트
 
 이 문서는 iPhone 웹앱과 macOS 네이티브 앱이 하나의 개인용 Supabase 계정을 공유하도록 만드는 진행표입니다. 체크 항목을 완료할 때마다 `[ ]`를 `[x]`로 변경합니다.
 
@@ -10,17 +10,17 @@
 - [x] `routine_completions`: 특정 날짜의 루틴 완료 기록을 저장하는 데이터 구조를 정의한다.
 - [x] iPhone의 기본 진입 방식은 홈 화면에 추가한 PWA로 확정한다.
 - [x] 빠른 할 일 등록은 `Back Tap → 단축어 → 빠른 입력 웹 경로`로 확정한다. 상세 내용은 [iPhone 빠른 실행 방법 조사](iphone-quick-launch-research.md)를 확인한다.
-- [ ] Mac 메뉴바의 빠른 추가와 조회 흐름을 확정한다.
+- [x] Mac 메뉴바의 빠른 추가와 조회 흐름을 확정한다.
 
 ## 2. Supabase 설정
 
-- [ ] Supabase 프로젝트를 생성한다.
-- [ ] [supabase/schema.sql](../supabase/schema.sql)을 SQL Editor에서 실행한다.
-- [ ] Auth에서 개인용 이메일·비밀번호 계정 하나를 생성한다.
-- [ ] 공개 회원가입을 비활성화하거나, 가입 화면을 배포하지 않아 단일 계정만 사용하도록 한다.
-- [ ] `NEXT_PUBLIC_SUPABASE_URL`: Supabase 프로젝트 주소를 `.env.local`에 설정한다.
-- [ ] `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: 클라이언트에서 RLS와 함께 사용하는 공개 Publishable key를 `.env.local`에 설정한다.
-- [ ] RLS(Row Level Security): 로그인한 사용자가 자신의 `tasks`, `routines`, `routine_completions`만 읽고 쓰는지 확인한다.
+- [x] Supabase 프로젝트를 생성한다.
+- [x] [supabase/schema.sql](../supabase/schema.sql)을 SQL Editor에서 실행한다.
+- [x] Auth에서 개인용 이메일·비밀번호 계정 하나를 생성한다.
+- [x] 공개 회원가입을 비활성화하거나, 가입 화면을 배포하지 않아 단일 계정만 사용하도록 한다.
+- [x] `NEXT_PUBLIC_SUPABASE_URL`: Supabase 프로젝트 주소를 `.env.local`에 설정한다.
+- [x] `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: 클라이언트에서 RLS와 함께 사용하는 공개 Publishable key를 `.env.local`에 설정한다.
+- [x] RLS(Row Level Security): 로그인한 사용자가 자신의 `tasks`, `routines`, `routine_completions`만 읽고 쓰는지 확인한다.
 
 ## 3. iPhone 웹앱
 
@@ -28,7 +28,8 @@
 - [x] 오늘의 루틴/할 일 조회 화면을 구현한다.
 - [x] 루틴과 할 일의 추가·완료 처리를 구현한다.
 - [x] `tasks`와 `routines`의 삭제를 구현하고, 삭제 전 확인 대화상자를 표시한다.
-- [ ] iPhone 15, 16, 17 화면 폭에서 터치·가독성을 확인한다.
+- [x] iPhone 15에서 터치·가독성과 빠른 입력 흐름을 확인한다.
+- [ ] iPhone 16, 17 화면 폭에서 터치·가독성을 확인한다.
 - [x] PWA(홈 화면에 추가 가능한 웹앱) 메타데이터를 추가한다.
 - [ ] Orbitly 전용 PWA 앱 아이콘을 추가한다.
 - [x] Safari에서 홈 화면 추가 후 독립 실행되는지 확인한다.
@@ -49,14 +50,14 @@
 - [x] 메뉴바에서 빠른 할 일 추가와 미완료 할 일 개수 조회를 구현한다.
 - [x] macOS 앱에서 `tasks`와 `routines` 삭제 및 확인 대화상자를 구현한다.
 - [ ] 전역 단축키: 다른 앱 사용 중에도 동작하는 호출 키의 필요성과 macOS 접근성 권한을 검토한다.
-- [ ] Personal Team 서명으로 로컬 설치를 확인한다.
+- [x] ad-hoc 서명으로 만든 macOS 앱을 로컬에 설치하고 실행한다. ad-hoc 서명은 개인 기기에서 직접 실행할 수 있게 하는 로컬 서명 방식이다.
 
 ## 5. 검증 및 개인 배포
 
 - [x] 웹앱 프로덕션 빌드를 확인한다.
 - [x] Swift 소스 문법을 확인하고 ad-hoc 서명된 `Orbitly.app` 묶음 생성을 확인한다.
 - [x] 401 인증 오류가 발생하면 오래된 로그인 세션을 정리하고 재로그인을 안내한다.
-- [ ] 실제 Supabase 계정으로 웹과 Mac 간 데이터 동기화를 확인한다.
+- [x] 실제 Supabase 계정으로 웹과 Mac 간 데이터 동기화를 확인한다.
 - [ ] 로그아웃 후 다른 사용자가 데이터에 접근하지 못하는지 확인한다.
 - [x] Vercel 배포용 Next.js 설정으로 웹 프로젝트를 정리한다.
 - [x] GitHub 저장소를 만들고 Orbitly 코드를 올린다.
@@ -64,7 +65,7 @@
 - [x] Vercel 환경 변수에 `NEXT_PUBLIC_SUPABASE_URL`과 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`를 Production 환경으로 등록한다.
 - [x] Vercel Production 배포를 실행한다. 현재 주소는 `https://orbitly-lac.vercel.app`이다.
 - [x] Vercel 배포 주소에서 iPhone 접속과 로그인 상태를 확인한다.
-- [ ] 실제 Vercel 주소를 [iPhone 단축어 설정](iphone-shortcut-setup.md)의 `YOUR_ORBITLY_DOMAIN`에 반영한다.
+- [x] 실제 Vercel 주소를 [iPhone 단축어 설정](iphone-shortcut-setup.md)에 반영한다.
 - [x] Safari에서 Orbitly를 홈 화면에 추가하고 PWA 독립 실행을 확인한다.
 - [x] Back Tap 삼중 탭으로 `빠른 할 일 입력` 단축어의 입력·저장 흐름을 확인한다.
 - [ ] 복구를 위한 Supabase 데이터 내보내기 방법을 기록한다.
