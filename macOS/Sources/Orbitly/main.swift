@@ -222,9 +222,7 @@ final class OrbitlyAppDelegate: NSObject, NSApplicationDelegate {
 
     private func configureStatusItem() {
         guard let button = statusItem.button else { return }
-        let image = NSImage(systemSymbolName: "circle.dotted", accessibilityDescription: "Orbitly")
-        image?.isTemplate = true
-        button.image = image
+        button.image = OrbitlyStatusIcon.make()
         button.toolTip = "Orbitly 빠른 추가 (⌃⌥⌘O)"
         button.target = self
         button.action = #selector(toggleQuickAdd)
@@ -285,6 +283,25 @@ final class OrbitlyAppDelegate: NSObject, NSApplicationDelegate {
 
     private var mainWindow: NSWindow? {
         NSApp.windows.first { $0.title == "Orbitly" && $0.styleMask.contains(.titled) && !($0 is NSPanel) }
+    }
+}
+
+// OrbitlyStatusIcon: 메뉴바의 단색 표시 규칙에 맞춘 행성·궤도·위성 점 아이콘입니다.
+private enum OrbitlyStatusIcon {
+    static func make() -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18))
+        image.lockFocus()
+        NSColor.black.setStroke()
+        let planet = NSBezierPath(ovalIn: NSRect(x: 5.2, y: 5.2, width: 7.6, height: 7.6))
+        planet.lineWidth = 1.35
+        planet.stroke()
+        let orbit = NSBezierPath(ovalIn: NSRect(x: 0.8, y: 6.25, width: 16.4, height: 5.5))
+        orbit.lineWidth = 1.15
+        orbit.stroke()
+        NSBezierPath(ovalIn: NSRect(x: 14.6, y: 12.35, width: 2.1, height: 2.1)).fill()
+        image.unlockFocus()
+        image.isTemplate = true
+        return image
     }
 }
 
