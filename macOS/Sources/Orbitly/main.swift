@@ -317,7 +317,7 @@ struct TodayView: View {
                     HStack(alignment: .top, spacing: 16) {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(dateLabel).font(.caption.weight(.semibold)).tracking(1.4).foregroundStyle(OrbitlyPalette.olive)
-                            Text("오늘의 흐름").font(.system(size: 42, weight: .bold, design: .rounded)).tracking(-1.8).foregroundStyle(OrbitlyPalette.ink)
+                            Text("Orbitly").font(.system(size: 42, weight: .bold, design: .rounded)).tracking(-1.8).foregroundStyle(OrbitlyPalette.ink)
                         }
                         Spacer()
                         HStack(spacing: 4) {
