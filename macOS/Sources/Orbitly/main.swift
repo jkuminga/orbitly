@@ -190,7 +190,11 @@ final class OrbitlyStore: ObservableObject {
         let message = error.localizedDescription.lowercased()
         return message.contains("jwt") || message.contains("token is expired") || message.contains("unauthorized")
     }
-    private func run(_ work: @escaping () async throws -> Void) async { isLoading = true; errorMessage = nil; defer { isLoading = false }; do { try await work() } catch { if isExpiredTokenError(error) { signOut(); errorMessage = "로그인 세션이 만료되었습니다. 다시 로그인해주세요." } else { errorMessage = error.localizedDescription } } }
+    private func isInvalidSessionError(_ error: Error) -> Bool {
+        let message = error.localizedDescription.lowercased()
+        return isExpiredTokenError(error) || message.contains("refresh token") || message.contains("invalid grant")
+    }
+    private func run(_ work: @escaping () async throws -> Void) async { isLoading = true; errorMessage = nil; defer { isLoading = false }; do { try await work() } catch { if isInvalidSessionError(error) { signOut(); errorMessage = "로그인 세션이 만료되었습니다. 다시 로그인해주세요." } else { errorMessage = error.localizedDescription } } }
 }
 
 // OrbitlyAppDelegate: 앱 창, 메뉴바 빠른 추가창, 전역 호출 키를 관리합니다.
