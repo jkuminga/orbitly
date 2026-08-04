@@ -9,7 +9,7 @@ swift run --package-path macOS
 macOS/scripts/build-app.sh
 ```
 
-두 번째 명령은 `macOS/dist/Orbitly.app`을 만듭니다. Finder에서 Applications 폴더로 옮긴 뒤 실행하면 됩니다. ad-hoc 서명은 본인 Mac에서만 사용하는 설치 방식이며 App Store 개발자 연회비가 필요하지 않습니다.
+두 번째 명령은 `macOS/dist.noindex/Orbitly.app`을 만듭니다. `dist.noindex`은 Spotlight 검색에서 제외되는 개발 빌드 폴더입니다. Finder에서 Applications 폴더로 옮긴 뒤 실행하면 됩니다. ad-hoc 서명은 본인 Mac에서만 사용하는 설치 방식이며 App Store 개발자 연회비가 필요하지 않습니다.
 
 ## 이후 업데이트
 

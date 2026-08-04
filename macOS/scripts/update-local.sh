@@ -4,7 +4,7 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 project_root="$(cd "$script_dir/../.." && pwd)"
 build_script="$script_dir/build-app.sh"
-source_app="$project_root/macOS/dist/Orbitly.app"
+source_app="$project_root/macOS/dist.noindex/Orbitly.app"
 install_dir="$HOME/Applications"
 installed_app="$install_dir/Orbitly.app"
 backup_app="$install_dir/Orbitly.previous.app"

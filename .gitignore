@@ -39,6 +39,7 @@ next-env.d.ts
 /dist/
 /macOS/.build/
 /macOS/dist/
+/macOS/dist.noindex/
 /.wrangler/
 /outputs/
 /work/
