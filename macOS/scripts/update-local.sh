@@ -7,7 +7,8 @@ build_script="$script_dir/build-app.sh"
 source_app="$project_root/macOS/dist.noindex/Orbitly.app"
 install_dir="$HOME/Applications"
 installed_app="$install_dir/Orbitly.app"
-backup_app="$install_dir/Orbitly.previous.app"
+backup_dir="$HOME/Library/Application Support/Orbitly/Backups.noindex"
+backup_app="$backup_dir/Orbitly.previous.app"
 skip_pull=false
 build_only=false
 
@@ -44,11 +45,11 @@ if [[ ! -d "$source_app" ]]; then
   exit 1
 fi
 
-mkdir -p "$install_dir"
+mkdir -p "$install_dir" "$backup_dir"
 
 if [[ -d "$installed_app" ]]; then
   if [[ -d "$backup_app" ]]; then
-    archived_backup="$install_dir/Orbitly.previous.$(date +%Y%m%d-%H%M%S).app"
+    archived_backup="$backup_dir/Orbitly.previous.$(date +%Y%m%d-%H%M%S).app"
     mv "$backup_app" "$archived_backup"
   fi
 

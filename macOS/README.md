@@ -21,7 +21,7 @@ macOS/scripts/update-local.sh
 
 `update-local.sh`는 GitHub 원격 저장소의 최신 코드를 `git pull --ff-only`로 받습니다. `--ff-only`는 내 로컬 변경과 자동으로 섞지 않고, 안전하게 바로 적용할 수 있을 때만 업데이트하는 옵션입니다. 이어서 앱을 빌드하고 `~/Applications/Orbitly.app`을 교체한 후 실행합니다.
 
-기존 앱은 삭제하지 않고 `~/Applications/Orbitly.previous.app`에 백업합니다. 로컬에서 아직 GitHub에 올리지 않은 변경을 바로 빌드하려면 `macOS/scripts/update-local.sh --skip-pull`을 사용합니다. 앱 설치 없이 빌드만 확인하려면 `--build-only`를 사용합니다.
+기존 앱은 삭제하지 않고 `~/Library/Application Support/Orbitly/Backups.noindex`에 백업합니다. `Backups.noindex`는 Spotlight 검색에서 제외되는 백업 폴더입니다. 로컬에서 아직 GitHub에 올리지 않은 변경을 바로 빌드하려면 `macOS/scripts/update-local.sh --skip-pull`을 사용합니다. 앱 설치 없이 빌드만 확인하려면 `--build-only`를 사용합니다.
 
 ## 메뉴바 빠른 추가와 전역 단축키
 
