@@ -23,6 +23,10 @@ macOS/scripts/update-local.sh
 
 기존 앱은 삭제하지 않고 `~/Applications/Orbitly.previous.app`에 백업합니다. 로컬에서 아직 GitHub에 올리지 않은 변경을 바로 빌드하려면 `macOS/scripts/update-local.sh --skip-pull`을 사용합니다. 앱 설치 없이 빌드만 확인하려면 `--build-only`를 사용합니다.
 
+## 메뉴바 빠른 추가와 전역 단축키
+
+메뉴바의 Orbitly 궤도 아이콘을 누르면 빠른 할 일 입력 창이 열립니다. 어느 앱을 사용 중이든 `⌃⌥⌘O`를 누르면 같은 창이 즉시 열리고 입력란에 포커스가 맞춰집니다. `⌃⌥⌘O`는 Control·Option·Command·O 조합이며, 일반 앱 단축키인 `⌘O`와 구분되는 전역 호출 키입니다.
+
 ## 첫 실행 설정
 
 1. 웹앱의 `.env.local`에서 `NEXT_PUBLIC_SUPABASE_URL`과 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 값을 확인합니다.

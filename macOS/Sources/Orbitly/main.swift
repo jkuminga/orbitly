@@ -1,5 +1,6 @@
 import SwiftUI
 import Security
+@preconcurrency import Carbon
 
 // SupabaseConfig: Supabase API URL과 공개 Publishable key를 기기에 저장하는 설정입니다.
 struct SupabaseConfig: Codable, Equatable {
@@ -162,10 +163,67 @@ final class OrbitlyStore: ObservableObject {
     private func run(_ work: @escaping () async throws -> Void) async { isLoading = true; errorMessage = nil; defer { isLoading = false }; do { try await work() } catch { if let message = (error as? LocalizedError)?.errorDescription, message.lowercased().contains("jwt") { signOut() }; errorMessage = error.localizedDescription } }
 }
 
-// OrbitlyAppDelegate: 실행·재실행 시 Orbitly 창을 활성화하고 키 입력 포커스를 부여합니다.
+// OrbitlyAppDelegate: 앱 창, 메뉴바 빠른 추가창, 전역 호출 키를 관리합니다.
+@MainActor
 final class OrbitlyAppDelegate: NSObject, NSApplicationDelegate {
+    private weak var store: OrbitlyStore?
+    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private let quickAddPopover = NSPopover()
+    private var hotKeyRef: EventHotKeyRef?
+    private var hotKeyHandler: EventHandlerRef?
+
+    func configure(store: OrbitlyStore) {
+        guard self.store == nil else { return }
+        self.store = store
+        configureStatusItem()
+        registerGlobalShortcut()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) { focusMainWindow(after: 0.15) }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { focusMainWindow(after: 0); return true }
+
+    private func configureStatusItem() {
+        guard let button = statusItem.button else { return }
+        let image = NSImage(systemSymbolName: "circle.dotted", accessibilityDescription: "Orbitly")
+        image?.isTemplate = true
+        button.image = image
+        button.toolTip = "Orbitly 빠른 추가 (⌃⌥⌘O)"
+        button.target = self
+        button.action = #selector(toggleQuickAdd)
+        quickAddPopover.behavior = .transient
+        quickAddPopover.animates = true
+    }
+
+    @objc private func toggleQuickAdd() {
+        if quickAddPopover.isShown { quickAddPopover.performClose(nil) } else { showQuickAdd() }
+    }
+
+    // showQuickAdd: 메뉴바 아이콘 아래에 빠른 할 일 입력 창을 열고 포커스를 줍니다.
+    func showQuickAdd() {
+        DispatchQueue.main.async {
+            guard let store = self.store, let button = self.statusItem.button else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            if self.quickAddPopover.isShown { self.quickAddPopover.performClose(nil) }
+            self.quickAddPopover.contentViewController = NSHostingController(rootView: MenuBarView().environmentObject(store))
+            self.quickAddPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        }
+    }
+
+    private func registerGlobalShortcut() {
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        let userData = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        InstallEventHandler(GetApplicationEventTarget(), { _, _, userData in
+            guard let userData else { return noErr }
+            Task { @MainActor in
+                let delegate = Unmanaged<OrbitlyAppDelegate>.fromOpaque(userData).takeUnretainedValue()
+                delegate.showQuickAdd()
+            }
+            return noErr
+        }, 1, &eventType, userData, &hotKeyHandler)
+        let hotKeyID = EventHotKeyID(signature: OSType(0x4F524254), id: 1) // ORBT
+        RegisterEventHotKey(UInt32(kVK_ANSI_O), UInt32(controlKey | optionKey | cmdKey), hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+    }
+
     private func focusMainWindow(after delay: TimeInterval) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             NSApp.activate(ignoringOtherApps: true)
@@ -180,8 +238,7 @@ struct OrbitlyApp: App {
     @StateObject private var store = OrbitlyStore()
     @NSApplicationDelegateAdaptor(OrbitlyAppDelegate.self) private var appDelegate
     var body: some Scene {
-        WindowGroup("Orbitly") { RootView().environmentObject(store).task { await store.restoreAndLoad() } }
-        MenuBarExtra("Orbitly", systemImage: "circle.dotted") { MenuBarView().environmentObject(store) }.menuBarExtraStyle(.window)
+        WindowGroup("Orbitly") { RootView().environmentObject(store).task { await store.restoreAndLoad() }.onAppear { appDelegate.configure(store: store) } }
     }
 }
 
@@ -194,21 +251,92 @@ struct RootView: View {
 struct ConfigView: View {
     @EnvironmentObject private var store: OrbitlyStore
     @FocusState private var isURLFocused: Bool
-    var body: some View { Form { Section("Supabase 연결") { TextField("Project URL", text: $store.config.url).focused($isURLFocused); SecureField("Publishable key", text: $store.config.publishableKey); Text("Publishable key는 RLS 정책과 함께 사용하는 공개 키입니다.").font(.caption).foregroundStyle(.secondary) }; Button("설정 저장") { store.saveConfig() }.disabled(!store.config.isComplete) }.padding().frame(width: 440).onAppear { isURLFocused = true } }
+    var body: some View {
+        ZStack {
+            OrbitlyPalette.canvas.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 22) {
+                OrbitlyBrand()
+                Text("연결 준비가\n필요합니다.").font(.system(size: 34, weight: .bold, design: .rounded)).tracking(-1.2).foregroundStyle(OrbitlyPalette.ink)
+                Text("웹앱과 같은 Supabase 프로젝트를 연결하면 오늘의 흐름을 바로 불러옵니다.").font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 8) { Text("PROJECT URL").font(.caption2.weight(.bold)).tracking(1); TextField("https://…supabase.co", text: $store.config.url).focused($isURLFocused).textFieldStyle(.plain).padding(12).background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 10)) }
+                VStack(alignment: .leading, spacing: 8) { Text("PUBLISHABLE KEY").font(.caption2.weight(.bold)).tracking(1); SecureField("sb_publishable_…", text: $store.config.publishableKey).textFieldStyle(.plain).padding(12).background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 10)) }
+                Button("연결 저장") { store.saveConfig() }.buttonStyle(.borderedProminent).tint(OrbitlyPalette.deepOlive).frame(maxWidth: .infinity).disabled(!store.config.isComplete)
+                Text("Publishable key는 RLS 정책과 함께 사용하는 공개 키입니다.").font(.caption).foregroundStyle(.secondary)
+            }.padding(32).frame(width: 450).background(OrbitlyPalette.card, in: RoundedRectangle(cornerRadius: 20)).overlay(RoundedRectangle(cornerRadius: 20).stroke(OrbitlyPalette.line, lineWidth: 1)).shadow(color: .black.opacity(0.06), radius: 22, y: 12)
+        }.frame(width: 560, height: 520).onAppear { isURLFocused = true }
+    }
 }
 
 struct SignInView: View {
     @EnvironmentObject private var store: OrbitlyStore
     @State private var email = ""; @State private var password = ""
     @FocusState private var isEmailFocused: Bool
-    var body: some View { VStack(alignment: .leading, spacing: 18) { Text("Orbitly").font(.largeTitle.bold()); Text("Mac과 iPhone의 할 일을 함께 관리합니다.").foregroundStyle(.secondary); TextField("이메일", text: $email).focused($isEmailFocused); SecureField("비밀번호", text: $password); Button("로그인") { Task { await store.signIn(email: email, password: password) } }.keyboardShortcut(.defaultAction).disabled(store.isLoading || email.isEmpty || password.isEmpty) }.padding(32).frame(width: 380).onAppear { isEmailFocused = true } }
+    var body: some View {
+        ZStack {
+            OrbitlyPalette.canvas.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 22) {
+                OrbitlyBrand()
+                Text("오늘을 가볍게\n정리하세요.").font(.system(size: 34, weight: .bold, design: .rounded)).tracking(-1.2).foregroundStyle(OrbitlyPalette.ink)
+                Text("Mac과 iPhone의 할 일을 함께 관리합니다.").font(.subheadline).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) { Text("이메일").font(.caption.weight(.semibold)); TextField("name@example.com", text: $email).focused($isEmailFocused).textFieldStyle(.plain).padding(12).background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 10)) }
+                VStack(alignment: .leading, spacing: 8) { Text("비밀번호").font(.caption.weight(.semibold)); SecureField("비밀번호", text: $password).textFieldStyle(.plain).padding(12).background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 10)) }
+                Button("시작하기") { Task { await store.signIn(email: email, password: password) } }.buttonStyle(.borderedProminent).tint(OrbitlyPalette.deepOlive).frame(maxWidth: .infinity).keyboardShortcut(.defaultAction).disabled(store.isLoading || email.isEmpty || password.isEmpty)
+            }.padding(32).frame(width: 430).background(OrbitlyPalette.card, in: RoundedRectangle(cornerRadius: 20)).overlay(RoundedRectangle(cornerRadius: 20).stroke(OrbitlyPalette.line, lineWidth: 1)).shadow(color: .black.opacity(0.06), radius: 22, y: 12)
+        }.frame(width: 560, height: 520).onAppear { isEmailFocused = true }
+    }
+}
+
+// OrbitlyBrand: 연결·로그인·메뉴바 화면에 반복되는 Orbitly 브랜드 표식입니다.
+private struct OrbitlyBrand: View {
+    var body: some View { HStack(spacing: 7) { Image(systemName: "circle.dotted").font(.title3).foregroundStyle(OrbitlyPalette.olive); Text("ORBITLY").font(.caption.weight(.bold)).tracking(1.5).foregroundStyle(.secondary) } }
+}
+
+// OrbitlyPalette: 웹앱과 macOS 앱에 공통으로 쓰는 따뜻한 아이보리·올리브 색상입니다.
+private enum OrbitlyPalette {
+    static let canvas = Color(red: 0.969, green: 0.965, blue: 0.949)
+    static let card = Color(red: 1, green: 0.996, blue: 0.98)
+    static let ink = Color(red: 0.14, green: 0.137, blue: 0.122)
+    static let olive = Color(red: 0.61, green: 0.61, blue: 0.39)
+    static let deepOlive = Color(red: 0.176, green: 0.188, blue: 0.141)
+    static let line = Color(red: 0.89, green: 0.88, blue: 0.84)
 }
 
 struct TodayView: View {
     @EnvironmentObject private var store: OrbitlyStore
     @State private var taskTitle = ""; @State private var routineTitle = ""
     @State private var deletion: PendingDeletion?
-    var body: some View { VStack(alignment: .leading, spacing: 18) { HStack { VStack(alignment: .leading) { Text("오늘의 흐름").font(.largeTitle.bold()); Text(Date.now.formatted(date: .abbreviated, time: .omitted)).foregroundStyle(.secondary) }; Spacer(); Button("새로고침") { Task { await store.load() } }; Button("로그아웃") { store.signOut() } }.padding(.bottom, 6); HStack(alignment: .top, spacing: 16) { ItemColumn(title: "매일 할 루틴", input: $routineTitle, placeholder: "루틴 추가", items: store.routines.map { ($0.id, $0.title, store.completedRoutineIDs.contains($0.id)) }, onAdd: { Task { await store.addRoutine(routineTitle); routineTitle = "" } }, onToggle: { id in if let item = store.routines.first(where: { $0.id == id }) { Task { await store.toggleRoutine(item) } } }, onDelete: { id in if let item = store.routines.first(where: { $0.id == id }) { deletion = PendingDeletion(id: id, title: item.title, kind: .routine) } }); ItemColumn(title: "해야 할 일", input: $taskTitle, placeholder: "할 일 추가", items: store.tasks.map { ($0.id, $0.title, $0.isCompleted) }, onAdd: { Task { await store.addTask(taskTitle); taskTitle = "" } }, onToggle: { id in if let item = store.tasks.first(where: { $0.id == id }) { Task { await store.toggleTask(item) } } }, onDelete: { id in if let item = store.tasks.first(where: { $0.id == id }) { deletion = PendingDeletion(id: id, title: item.title, kind: .task) } }) } }.padding(28).frame(minWidth: 720, minHeight: 440).confirmationDialog("항목을 삭제할까요?", isPresented: Binding(get: { deletion != nil }, set: { if !$0 { deletion = nil } })) { Button("삭제", role: .destructive) { deleteSelectedItem() }; Button("취소", role: .cancel) { deletion = nil } } message: { Text(deletion.map { "“\($0.title)”은(는) 삭제 후 복구할 수 없습니다." } ?? "") } }
+    private var completedCount: Int { store.completedRoutineIDs.count + store.tasks.filter(\.isCompleted).count }
+    private var totalCount: Int { store.routines.count + store.tasks.count }
+    private var progress: Double { totalCount == 0 ? 0 : Double(completedCount) / Double(totalCount) }
+    private var dateLabel: String { Date.now.formatted(.dateTime.month(.wide).day().weekday(.abbreviated)) }
+    var body: some View {
+        ZStack {
+            OrbitlyPalette.canvas.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    HStack(alignment: .top, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(dateLabel).font(.caption.weight(.semibold)).tracking(1.4).foregroundStyle(OrbitlyPalette.olive)
+                            Text("오늘의 흐름").font(.system(size: 42, weight: .bold, design: .rounded)).tracking(-1.8).foregroundStyle(OrbitlyPalette.ink)
+                        }
+                        Spacer()
+                        HStack(spacing: 4) {
+                            Button { Task { await store.load() } } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.plain).padding(9).background(.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
+                            Button("로그아웃") { store.signOut() }.buttonStyle(.plain).foregroundStyle(.secondary).padding(9)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("\(completedCount) 완료").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                        ProgressView(value: progress).tint(OrbitlyPalette.olive).scaleEffect(x: 1, y: 1.35, anchor: .center)
+                    }.padding(.vertical, 4)
+                    HStack(alignment: .top, spacing: 18) {
+                        ItemColumn(title: "매일 할 루틴", count: "\(store.completedRoutineIDs.count)/\(store.routines.count)", input: $routineTitle, placeholder: "예: 물 한 잔 마시기", items: store.routines.map { ($0.id, $0.title, store.completedRoutineIDs.contains($0.id)) }, onAdd: { Task { await store.addRoutine(routineTitle); routineTitle = "" } }, onToggle: { id in if let item = store.routines.first(where: { $0.id == id }) { Task { await store.toggleRoutine(item) } } }, onDelete: { id in if let item = store.routines.first(where: { $0.id == id }) { deletion = PendingDeletion(id: id, title: item.title, kind: .routine) } })
+                        ItemColumn(title: "해야 할 일", count: "\(store.tasks.filter { !$0.isCompleted }.count) 남음", input: $taskTitle, placeholder: "할 일 추가", items: store.tasks.map { ($0.id, $0.title, $0.isCompleted) }, onAdd: { Task { await store.addTask(taskTitle); taskTitle = "" } }, onToggle: { id in if let item = store.tasks.first(where: { $0.id == id }) { Task { await store.toggleTask(item) } } }, onDelete: { id in if let item = store.tasks.first(where: { $0.id == id }) { deletion = PendingDeletion(id: id, title: item.title, kind: .task) } })
+                    }
+                }.padding(32)
+            }
+        }.frame(minWidth: 760, minHeight: 520).confirmationDialog("항목을 삭제할까요?", isPresented: Binding(get: { deletion != nil }, set: { if !$0 { deletion = nil } })) { Button("삭제", role: .destructive) { deleteSelectedItem() }; Button("취소", role: .cancel) { deletion = nil } } message: { Text(deletion.map { "“\($0.title)”은(는) 삭제 후 복구할 수 없습니다." } ?? "") }
+    }
     // deleteSelectedItem: 확인된 삭제 대상을 tasks 또는 routines에서 제거합니다.
     private func deleteSelectedItem() { guard let deletion else { return }; self.deletion = nil; Task { if deletion.kind == .task, let task = store.tasks.first(where: { $0.id == deletion.id }) { await store.deleteTask(task) } else if let routine = store.routines.first(where: { $0.id == deletion.id }) { await store.deleteRoutine(routine) } } }
 }
@@ -217,13 +345,44 @@ struct TodayView: View {
 struct PendingDeletion: Identifiable { enum Kind { case task, routine }; let id: UUID; let title: String; let kind: Kind }
 
 struct ItemColumn: View {
-    let title: String; @Binding var input: String; let placeholder: String; let items: [(UUID, String, Bool)]; let onAdd: () -> Void; let onToggle: (UUID) -> Void; let onDelete: (UUID) -> Void
-    var body: some View { VStack(alignment: .leading, spacing: 10) { Text(title).font(.headline); List(items, id: \.0) { item in HStack { Button { onToggle(item.0) } label: { Label(item.1, systemImage: item.2 ? "checkmark.circle.fill" : "circle") }.buttonStyle(.plain); Spacer(); Button(role: .destructive) { onDelete(item.0) } label: { Image(systemName: "trash") }.buttonStyle(.borderless).help("삭제") } }.frame(minHeight: 250); HStack { TextField(placeholder, text: $input).onSubmit(onAdd); Button(action: onAdd) { Image(systemName: "plus") }.keyboardShortcut("n", modifiers: [.command]) } }.frame(maxWidth: .infinity) }
+    let title: String; let count: String; @Binding var input: String; let placeholder: String; let items: [(UUID, String, Bool)]; let onAdd: () -> Void; let onToggle: (UUID) -> Void; let onDelete: (UUID) -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack { Text(title).font(.headline.weight(.semibold)).foregroundStyle(OrbitlyPalette.ink); Spacer(); Text(count).font(.caption.weight(.medium)).foregroundStyle(.secondary) }
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(items, id: \.0) { item in
+                        HStack(spacing: 10) {
+                            Button { onToggle(item.0) } label: { Image(systemName: item.2 ? "checkmark.circle.fill" : "circle").foregroundStyle(item.2 ? OrbitlyPalette.olive : Color.secondary).font(.title3) }.buttonStyle(.plain)
+                            Text(item.1).strikethrough(item.2).foregroundStyle(item.2 ? .secondary : OrbitlyPalette.ink).frame(maxWidth: .infinity, alignment: .leading)
+                            Button(role: .destructive) { onDelete(item.0) } label: { Image(systemName: "xmark") }.buttonStyle(.plain).foregroundStyle(.tertiary).help("삭제")
+                        }.padding(.vertical, 11).padding(.horizontal, 2).overlay(alignment: .bottom) { Rectangle().fill(OrbitlyPalette.line).frame(height: 1) }
+                    }
+                    if items.isEmpty { Text(title == "매일 할 루틴" ? "첫 루틴을 만들어보세요." : "지금 해야 할 일은 없어요.").font(.subheadline).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 164, alignment: .leading) }
+                }
+            }.frame(minHeight: 180, maxHeight: 260)
+            HStack(spacing: 8) {
+                TextField(placeholder, text: $input).textFieldStyle(.plain).padding(.horizontal, 12).padding(.vertical, 11).background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(OrbitlyPalette.line, lineWidth: 1)).onSubmit(onAdd)
+                Button(action: onAdd) { Image(systemName: "plus").fontWeight(.bold).frame(width: 20, height: 20) }.buttonStyle(.borderedProminent).tint(OrbitlyPalette.deepOlive).disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }.padding(24).frame(maxWidth: .infinity, alignment: .topLeading).background(OrbitlyPalette.card, in: RoundedRectangle(cornerRadius: 18)).overlay(RoundedRectangle(cornerRadius: 18).stroke(OrbitlyPalette.line, lineWidth: 1)).shadow(color: .black.opacity(0.035), radius: 16, y: 8)
+    }
 }
 
 struct MenuBarView: View {
     @EnvironmentObject private var store: OrbitlyStore
     @State private var title = ""
-    var body: some View { VStack(alignment: .leading, spacing: 12) { Text("빠른 할 일 추가").font(.headline); TextField("할 일", text: $title).onSubmit(add); Button("저장", action: add).disabled(title.isEmpty); Divider(); Text("미완료 \(store.tasks.filter { !$0.isCompleted }.count)개").foregroundStyle(.secondary); Button("Orbitly 열기") { NSApp.activate(ignoringOtherApps: true) }; Button("종료") { NSApplication.shared.terminate(nil) } }.padding().frame(width: 280) }
+    @FocusState private var isInputFocused: Bool
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack { Image(systemName: "circle.dotted").foregroundStyle(OrbitlyPalette.olive); Text("ORBITLY").font(.caption.weight(.bold)).tracking(1.2).foregroundStyle(.secondary); Spacer(); Text("⌃⌥⌘O").font(.caption2.monospaced()).foregroundStyle(.tertiary) }
+            Text("빠른 할 일 추가").font(.title3.weight(.semibold))
+            TextField("할 일을 입력하세요", text: $title).textFieldStyle(.plain).focused($isInputFocused).padding(10).background(OrbitlyPalette.canvas, in: RoundedRectangle(cornerRadius: 9)).onSubmit(add)
+            Button("저장", action: add).buttonStyle(.borderedProminent).tint(OrbitlyPalette.deepOlive).frame(maxWidth: .infinity).disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Divider()
+            HStack { Text("미완료").foregroundStyle(.secondary); Spacer(); Text("\(store.tasks.filter { !$0.isCompleted }.count)개").fontWeight(.semibold) }
+            Button("오늘 목록 열기") { NSApp.activate(ignoringOtherApps: true); NSApp.windows.first { $0.canBecomeKey }?.makeKeyAndOrderFront(nil) }.buttonStyle(.plain).foregroundStyle(OrbitlyPalette.deepOlive)
+        }.padding(16).frame(width: 300).onAppear { isInputFocused = true }
+    }
     private func add() { let value = title; title = ""; Task { await store.addTask(value) } }
 }
