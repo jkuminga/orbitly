@@ -2,11 +2,15 @@ import SwiftUI
 import Security
 @preconcurrency import Carbon
 
-// SupabaseConfig: Supabase API URL과 공개 Publishable key를 기기에 저장하는 설정입니다.
+// SupabaseConfig: Orbitly 앱에 고정된 Supabase API URL과 공개 Publishable key 설정입니다.
 struct SupabaseConfig: Codable, Equatable {
     var url: String
     var publishableKey: String
     var isComplete: Bool { URL(string: url) != nil && publishableKey.hasPrefix("sb_publishable_") }
+    static let bundled = SupabaseConfig(
+        url: Bundle.main.object(forInfoDictionaryKey: "OrbitlySupabaseURL") as? String ?? "",
+        publishableKey: Bundle.main.object(forInfoDictionaryKey: "OrbitlySupabasePublishableKey") as? String ?? ""
+    )
 }
 
 // SupabaseSession: Auth가 발급한 로그인 토큰과 만료 시각입니다.
@@ -122,7 +126,7 @@ private struct EmptyResponse: Codable {}
 // OrbitlyStore: 화면 상태와 Supabase 동기화를 관리하는 앱의 상태 객체입니다.
 @MainActor
 final class OrbitlyStore: ObservableObject {
-    @Published var config = SupabaseConfig(url: UserDefaults.standard.string(forKey: "supabaseURL") ?? "", publishableKey: UserDefaults.standard.string(forKey: "supabasePublishableKey") ?? "")
+    let config = SupabaseConfig.bundled
     @Published var session: SupabaseSession? = nil
     @Published var tasks: [TaskItem] = []
     @Published var routines: [RoutineItem] = []
@@ -134,9 +138,8 @@ final class OrbitlyStore: ObservableObject {
     private var refreshTask: Task<SupabaseSession, Error>?
     private let refreshLeadTime: TimeInterval = 5 * 60
     init() { session = KeychainStore.read() }
-    func saveConfig() { UserDefaults.standard.set(config.url.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "supabaseURL"); UserDefaults.standard.set(config.publishableKey.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "supabasePublishableKey") }
     func signIn(email: String, password: String) async {
-        guard let client else { errorMessage = "Supabase 설정을 먼저 입력해주세요."; return }
+        guard let client else { errorMessage = "Orbitly의 Supabase 연결 정보를 찾을 수 없습니다. 앱을 다시 빌드해주세요."; return }
         await run { let session = try await client.signIn(email: email, password: password); self.session = session; try KeychainStore.save(session); await self.load() }
     }
     func restoreAndLoad() async {
@@ -331,25 +334,20 @@ private struct OrbitlyMainWindow: View {
 // RootView: 설정, 로그인, 오늘 목록 화면을 현재 상태에 맞춰 전환합니다.
 struct RootView: View {
     @EnvironmentObject private var store: OrbitlyStore
-    var body: some View { Group { if !store.config.isComplete { ConfigView() } else if store.session == nil { SignInView() } else { TodayView() } }.alert("Orbitly", isPresented: Binding(get: { store.errorMessage != nil }, set: { if !$0 { store.errorMessage = nil } })) { Button("확인", role: .cancel) {} } message: { Text(store.errorMessage ?? "") } }
+    var body: some View { Group { if !store.config.isComplete { ConnectionErrorView() } else if store.session == nil { SignInView() } else { TodayView() } }.alert("Orbitly", isPresented: Binding(get: { store.errorMessage != nil }, set: { if !$0 { store.errorMessage = nil } })) { Button("확인", role: .cancel) {} } message: { Text(store.errorMessage ?? "") } }
 }
 
-struct ConfigView: View {
-    @EnvironmentObject private var store: OrbitlyStore
-    @FocusState private var isURLFocused: Bool
+// ConnectionErrorView: 정상 빌드에서는 나타나지 않으며, 환경 파일 없이 만든 개발 빌드를 안내합니다.
+struct ConnectionErrorView: View {
     var body: some View {
         ZStack {
             OrbitlyPalette.canvas.ignoresSafeArea()
             VStack(alignment: .leading, spacing: 22) {
                 OrbitlyBrand()
                 Text("연결 준비가\n필요합니다.").font(.system(size: 34, weight: .bold, design: .rounded)).tracking(-1.2).foregroundStyle(OrbitlyPalette.ink)
-                Text("웹앱과 같은 Supabase 프로젝트를 연결하면 오늘의 흐름을 바로 불러옵니다.").font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                VStack(alignment: .leading, spacing: 8) { Text("PROJECT URL").font(.caption2.weight(.bold)).tracking(1); TextField("https://…supabase.co", text: $store.config.url).focused($isURLFocused).textFieldStyle(.plain).padding(12).background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 10)) }
-                VStack(alignment: .leading, spacing: 8) { Text("PUBLISHABLE KEY").font(.caption2.weight(.bold)).tracking(1); SecureField("sb_publishable_…", text: $store.config.publishableKey).textFieldStyle(.plain).padding(12).background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 10)) }
-                Button("연결 저장") { store.saveConfig() }.buttonStyle(.borderedProminent).tint(OrbitlyPalette.deepOlive).frame(maxWidth: .infinity).disabled(!store.config.isComplete)
-                Text("Publishable key는 RLS 정책과 함께 사용하는 공개 키입니다.").font(.caption).foregroundStyle(.secondary)
+                Text("이 앱에는 Supabase 연결 정보가 포함되지 않았습니다. 프로젝트 폴더에서 `macOS/scripts/update-local.sh`를 실행해 다시 설치해주세요.").font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }.padding(32).frame(width: 450).background(OrbitlyPalette.card, in: RoundedRectangle(cornerRadius: 20)).overlay(RoundedRectangle(cornerRadius: 20).stroke(OrbitlyPalette.line, lineWidth: 1)).shadow(color: .black.opacity(0.06), radius: 22, y: 12)
-        }.frame(width: 560, height: 520).onAppear { isURLFocused = true }
+        }.frame(width: 560, height: 520)
     }
 }
 

@@ -29,8 +29,8 @@ macOS/scripts/update-local.sh
 
 ## 첫 실행 설정
 
-1. 웹앱의 `.env.local`에서 `NEXT_PUBLIC_SUPABASE_URL`과 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 값을 확인합니다.
-2. Orbitly의 Supabase 연결 화면에 각각 붙여넣고 저장합니다.
-3. 웹앱과 같은 개인 이메일·비밀번호로 로그인합니다.
+`macOS/scripts/build-app.sh`와 `update-local.sh`는 프로젝트 루트의 `.env.local`에서 `NEXT_PUBLIC_SUPABASE_URL`과 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`를 읽어 앱에 포함합니다. 따라서 설치 후에는 Supabase 연결 화면이 나타나지 않으며, 웹앱과 같은 개인 이메일·비밀번호로 한 번만 로그인하면 됩니다.
+
+Publishable key는 RLS 정책과 함께 사용하는 공개 키입니다. 앱에 포함되어도 데이터 접근은 로그인 세션과 RLS(Row Level Security) 정책으로 제한됩니다. `.env.local` 자체는 Git에 올리지 않습니다.
 
 `SupabaseSession`은 access token과 refresh token을 담는 로그인 상태이며, macOS Keychain에 저장됩니다. `tasks`는 일회성 할 일, `routines`는 매일 반복하는 루틴, `routine_completions`는 날짜별 루틴 완료 기록입니다.
