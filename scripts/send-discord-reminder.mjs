@@ -14,7 +14,8 @@ function koreaDate() {
 
 async function select(path) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: { apikey: SUPABASE_SECRET_KEY, Authorization: `Bearer ${SUPABASE_SECRET_KEY}` },
+    // sb_secret_ 형식의 Secret key는 JWT가 아니므로 apikey 헤더로만 전달합니다.
+    headers: { apikey: SUPABASE_SECRET_KEY },
   });
   if (!response.ok) throw new Error(`Supabase query failed (${response.status}): ${await response.text()}`);
   return response.json();
