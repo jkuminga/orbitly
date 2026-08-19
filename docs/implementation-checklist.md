@@ -77,4 +77,4 @@
 
 - [x] Supabase Cron이 KST 09:17부터 다음 날 01:47까지 90분 간격으로 Discord 알림을 실행하도록 구성한다.
 - [x] 미완료 `tasks`와 당일 미완료 `routines`만 Discord 메시지에 포함한다.
-- [ ] Supabase Cron에서 **orbitly-discord-reminder-17** 또는 **orbitly-discord-reminder-47** 실행 기록과 실제 Discord 수신을 확인한다. `pg_cron`은 Supabase 데이터베이스 안에서 예약 작업을 실행하는 기능이다.
+- [x] Supabase Cron에서 **orbitly-discord-reminder-17** 또는 **orbitly-discord-reminder-47** 실행 기록과 실제 Discord 수신을 확인했다. `pg_cron`은 Supabase 데이터베이스 안에서 예약 작업을 실행하는 기능이다.
