@@ -72,3 +72,9 @@
 - [x] Safari에서 Orbitly를 홈 화면에 추가하고 PWA 독립 실행을 확인한다.
 - [x] Back Tap 삼중 탭으로 `빠른 할 일 입력` 단축어의 입력·저장 흐름을 확인한다.
 - [ ] 복구를 위한 Supabase 데이터 내보내기 방법을 기록한다.
+
+## 6. Discord 알림
+
+- [x] GitHub Actions가 KST 09:17부터 다음 날 01:47까지 90분 간격으로 Discord 알림을 실행하도록 구성한다.
+- [x] 미완료 `tasks`와 당일 미완료 `routines`만 Discord 메시지에 포함한다.
+- [ ] GitHub Actions에서 **Orbitly Discord reminders**를 수동 실행해 실제 Discord 수신을 확인한다.

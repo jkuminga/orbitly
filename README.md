@@ -23,3 +23,7 @@ Vercel Project Settings의 Environment Variables에 다음을 등록합니다.
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: 브라우저에서 RLS 정책과 함께 사용하는 공개 키입니다.
 
 자세한 진행 사항은 [docs/implementation-checklist.md](docs/implementation-checklist.md)를 참고하세요.
+
+## Discord 알림
+
+GitHub Actions가 미완료 할 일과 루틴을 Discord 채널로 90분 간격 전송합니다. 설정과 즉시 테스트 방법은 [Discord 알림 안내](docs/discord-reminders.md)를 확인하세요.
