@@ -26,4 +26,4 @@ Vercel Project Settings의 Environment Variables에 다음을 등록합니다.
 
 ## Discord 알림
 
-GitHub Actions가 미완료 할 일과 루틴을 Discord 채널로 90분 간격 전송합니다. 설정과 즉시 테스트 방법은 [Discord 알림 안내](docs/discord-reminders.md)를 확인하세요.
+Supabase Cron이 미완료 할 일과 루틴을 Discord 채널로 90분 간격 전송합니다. 설정 방법은 [Discord 알림 설정 SQL](supabase/discord-reminder-cron.sql)을 확인하세요.
