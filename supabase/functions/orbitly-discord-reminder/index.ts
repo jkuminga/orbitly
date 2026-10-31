@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { fallbackMotivation, fetchTrending, generateMotivation } from "./motivation.ts";
 
 // koreaDate: Discord 알림에서 사용할 기준일을 한국 시간 YYYY-MM-DD로 계산합니다.
 function koreaDate() {
@@ -49,13 +50,29 @@ Deno.serve(async () => {
   const remainingRoutines = routines.filter((routine) => !completedRoutineIDs.has(routine.id));
   if (!tasks.length && !remainingRoutines.length) return Response.json({ sent: false, reason: "All Orbitly items are complete." });
 
+  // motivation: 매 알림의 최신 완료율로 생성하며, 외부 서비스 실패 시 기본 문구를 사용합니다.
+  const completedCount = routines.length - remainingRoutines.length;
+  let motivation = fallbackMotivation(completedCount, routines.length, tasks.length);
+  const openAIKey = Deno.env.get("OPENAI_API_KEY");
+  if (openAIKey) {
+    try {
+      const repositories = await fetchTrending();
+      motivation = await generateMotivation(openAIKey, completedCount, routines.length, tasks.length, repositories);
+      if (routines.length > 0 && completedCount === routines.length && /좆|씨발|개새끼|못 가|못가|안 보겠|구경만|누워|쳐누워/.test(motivation)) {
+        motivation = fallbackMotivation(completedCount, routines.length, tasks.length);
+      }
+    } catch (error) {
+      console.warn("Motivation generation failed; using fallback.", error);
+    }
+  }
+
   const content = [
-    `🌙 **Orbitly · 오늘의 흐름** (${today})`,
+    motivation,
     "",
     `**할 일 · ${tasks.length}개 남음**`,
     list(tasks),
     "",
-    `**루틴 · ${completedRoutineIDs.size}/${routines.length} 완료**`,
+    `**루틴 · ${completedCount}/${routines.length} 완료**`,
     list(remainingRoutines),
   ].join("\n").slice(0, 1_900);
   const discordResponse = await fetch(discordWebhookURL, {
